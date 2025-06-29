@@ -2,77 +2,41 @@ import os, sys
 here = os.path.dirname(__file__) 
 sys.path.insert(0, here)
 from  captioner import  LightweightONNXCaptioner
+from panel import  CaptionLocalSettingsPanel
 import base64
-import gui, wx
+import gui
 from gui import guiHelper
-import textInfos
+import config
 import scriptHandler
 import json
 import ui
 import globalPluginHandler
-import tones # We want to hear beeps.
-import subprocess
 import io
 import threading 
 import api
 import wx
-import urllib.request
-import urllib.error
 
-#Insure one instance of Search with dialog is active.
-_searchWithDialog= None
+confspec = {
+	"localModelPath":"string(default=/)",
 
-
-# 构建请求的 URL（服务器的接收端点）,第一个打算弃用,它不支持提问,而且没有多语言支持, 只能输出中文, 而且有时会冒两句英文
-# url = 'https://caption.flowersky.love'  
-url = 'https://caption.aiursoft.tech'  
-# queryUrl = "http://localhost:8787"
-# queryUrl = "https://vision.flowersky.love"
-queryUrl = "https://vision.aiursoft.tech"
-
-# 构建请求头，包括内容类型和 Bearer API Key
-headers = {
-    "User-Agent": "curl/7.68.0",  # 这里模拟的是curl的请求头
-    # 'Content-Type': 'image/png',  # 指定内容类型为 PNG 图像
-    'Content-Type': 'application/json', 
-    'Authorization': 'Bearer luckydog'  # 使用 Bearer 认证，将 'YOUR_API_KEY' 替换为实际的 API Key
+	# "logBackupMaxNumber":"integer(default=5)",
+	# "logBackup":"list(default=[])"
 }
-
-
-def isSelectedText():
-    '''this function  specifies if a certain text is selected or not
-        and if it is, returns text selected.
-    '''
-    obj=api.getFocusObject()
-    treeInterceptor=obj.treeInterceptor
-    if hasattr(treeInterceptor,'TextInfo') and not treeInterceptor.passThrough:
-        obj=treeInterceptor
-    try:
-        info=obj.makeTextInfo(textInfos.POSITION_SELECTION)
-    except (RuntimeError, NotImplementedError, LookupError):
-        info=None
-    if not info or info.isCollapsed:
-        return False
-    else:
-        return info.text.strip()
-
+config.conf.spec['captionLocal']=confspec
 def shootImage():
-    # 获取当前屏幕上聚焦的对象，通常是一个导航对象（可能表示当前窗口或屏幕的某一部分）
+    # 获取当前屏幕上聚焦的对象，通常是一个导航对象
     obj = api.getNavigatorObject()
+    # ui.message("shooting")
     
     # 获取对象的位置和尺寸信息，即 x 和 y 位置，以及宽度和高度
     x, y, width, height = obj.location
-    
-    # 如果启用了 sizeReport 选项，并且脚本没有被重复调用（通常与按键脚本相关）
-    # 这里的代码被注释掉了，通常用于报告尺寸
-    # if conf["sizeReport"] and scriptHandler.getLastScriptRepeatCount() != 1:
-    #    ui.message(_("Size: {width} X {height} pixels").format(width=width, height=height))
     
     # 创建一个与对象尺寸相同的空白位图，准备在其上绘制图像
     bmp = wx.Bitmap(width, height)
     
     # 创建一个内存设备上下文，用于在位图上进行绘图操作
     mem = wx.MemoryDC(bmp)
+    # ui.message("create memory")
     
     # 将屏幕上的指定区域（由 x, y, width, height 指定）复制到内存位图中
     mem.Blit(0, 0, width, height, wx.ScreenDC(), x, y)
@@ -84,26 +48,14 @@ def shootImage():
     body = io.BytesIO()
     
     # 将图像保存到字节流中，使用 PNG 格式
-    image.SaveFile(body, wx.BITMAP_TYPE_PNG)
+    image.SaveFile(body, wx.BITMAP_TYPE_JPEG)
     
     # 从字节流对象中读取图像的二进制数据，以便进一步处理或保存
     image_data = body.getvalue()
     return  image_data
 
 def caption(captioner: LightweightONNXCaptioner, image_data):
-    # image_data 是要发送的图像的二进制数据（假设之前已经从 BytesIO 对象中读取）
-
-
-
-    # captioner = LightweightONNXCaptioner(
-        # encoder_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/onnx/encoder_model_quantized.onnx",
-        # decoder_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/onnx/decoder_model_merged_quantized.onnx",
-        # config_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/config.json"  # 必选
-    # )
-
-
     try:
-        # description = captioner.generate_caption(image="D:/mypython/nvda/addons/plugin/captionLocal/addon/globalPlugins/CaptionLocal/porridge.png")
         description = captioner.generate_caption(image=image_data)
         ui.message(description)
         api.copyToClip(text=description, notify=False)
@@ -116,6 +68,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def __init__(self):
         super().__init__()
         self.is_model_loaded = False
+        gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(CaptionLocalSettingsPanel)
+
+    
+    def terminate(self):
+        try:
+            NVDASettingsDialog.categoryClasses.remove(CaptionLocalSettingsPanel)
+        except:
+            pass
 
 
     @scriptHandler.script(
@@ -127,7 +87,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     )
     def script_runCaption(self, gesture):
         image_data= shootImage()
-        ui.message("got image")
+        # ui.message("got image")
 
         if self.is_model_loaded: 
             pass
