@@ -22,13 +22,16 @@ class LightweightONNXCaptioner:
             decoder_path: GPT-2 解码器 ONNX 模型路径
             config_path: 配置文件路径（必选）
         """
-        # 加载 ONNX 模型
-        self.encoder_session = ort.InferenceSession(encoder_path)
-        self.decoder_session = ort.InferenceSession(decoder_path)
-
         # 加载配置文件
-        with open(config_path, 'r', encoding='utf-8') as f:
-            self.config = json.load(f)
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                self.config = json.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"config file  {config_path} not fount, please download models and  config first!")
+        except Exception as e:
+            print(e)
+            raise
+
 
         # 自动加载词汇表（vocab.json在config.json同目录下）
         config_dir = os.path.dirname(config_path)
@@ -38,6 +41,12 @@ class LightweightONNXCaptioner:
 
         # 从配置文件加载所有模型参数
         self._load_model_params()
+
+
+
+        # 加载 ONNX 模型
+        self.encoder_session = ort.InferenceSession(encoder_path)
+        self.decoder_session = ort.InferenceSession(decoder_path)
 
         print(f"Loaded ONNX models - Encoder: {encoder_path}, Decoder: {decoder_path}")
         print(f"Loaded config from: {config_path}")

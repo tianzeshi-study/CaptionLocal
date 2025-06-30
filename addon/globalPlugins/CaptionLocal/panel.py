@@ -19,26 +19,6 @@ import addonHandler
 ADDON_SUMMARY =  "caption  using local model"
 
 
-def getBaseProfileConfigValue(*args):
-	cfg = config.conf.profiles[0]
-	for key in args:
-		try:
-			cfg = cfg[key]
-		except KeyError:
-			break
-	else:
-		validationFuncName = config.conf.getConfigValidation(tuple(args)).validationFuncName
-		typeMaker = {
-			'integer': int,
-			'string': str,
-			'option': str,
-			'float': float,
-		}.get(validationFuncName)
-		if not typeMaker:
-			raise NotImplementedError(validationFuncName)
-		return typeMaker(cfg)
-	return config.conf.getConfigValidation(tuple(args)).default
-
 class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
 	title = ADDON_SUMMARY
 
@@ -79,32 +59,7 @@ class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
 		self.modelPathEdit = directoryEntryControl.pathControl
 		self.modelPathEdit.Value = config.conf['captionLocal']['localModelPath']
 
-		# Translators: This is a label for the combo box in the NDTT Settings panel.
-		# text = _("Backup of old logs:")
-		# self.makeBackupsList = sHelper.addLabeledControl(
-			# text,
-			# wx.Choice,
-			# choices=[label for val, label in self.BACKUP_TYPES],
-		# )
-		# val = getBaseProfileConfigValue('captionLocal', 'logBackup')
-		# index = [v for v, l in self.BACKUP_TYPES].index(val)
-		# self.makeBackupsList.Select(index)
-		# backupType = self.BACKUP_TYPES[index][0]
-		# self.makeBackupsList.Bind(wx.EVT_CHOICE, self.onMakeBackupsListItemChanged)
 
-		# minNbBackups = int(self.getParameterBound("logBackupMaxNumber", "min"))
-		# maxNbBackups = int(self.getParameterBound("logBackupMaxNumber", "max"))
-
-		# Translators: This is a label for a setting in the settings panel
-		# text = _("Limit the number of backups to:")
-		# self.nbBackupsEdit = sHelper.addLabeledControl(
-			# text,
-			# nvdaControls.SelectOnFocusSpinCtrl,
-			# min=minNbBackups,
-			# max=maxNbBackups,
-			# initial=getBaseProfileConfigValue('captionLocal', 'logBackupMaxNumber'),
-		# )
-		# self.updateNbBackupsEdit(backupType)
 
 	@staticmethod
 	def getParameterBound(name, boundType):

@@ -102,15 +102,20 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
     def _loadModel(self): 
         try:
+            localModelDirPath = config.conf['captionLocal']['localModelPath']
+            encoder_path=f"{localModelDirPath}/onnx/encoder_model_quantized.onnx"
+            decoder_path = f"{localModelDirPath}/onnx/decoder_model_merged_quantized.onnx"
+            config_path = f"{localModelDirPath}/config.json"  
             self.captioner = LightweightONNXCaptioner(
-                encoder_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/onnx/encoder_model_quantized.onnx",
-                decoder_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/onnx/decoder_model_merged_quantized.onnx",
-                config_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/config.json"  # 必选
+                encoder_path=encoder_path,
+                decoder_path=decoder_path,
+                config_path=config_path,
             )
             self.is_model_loaded = True
         except Exception as e:
             self.is_model_loaded =False
-            ui.message(e)
+            ui.message(str(e))
+            raise
     
     @scriptHandler.script(
         description=_("release  local model"),
