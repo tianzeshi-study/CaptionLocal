@@ -2,6 +2,7 @@ import os, sys
 here = os.path.dirname(__file__) 
 sys.path.insert(0, here)
 from  captioner import  LightweightONNXCaptioner
+from modelManager import  ModelManagerFrame
 from panel import  CaptionLocalSettingsPanel
 import base64
 import gui
@@ -15,12 +16,14 @@ import io
 import threading 
 import api
 import wx
-
+models_dir = os.path.join(here, "..", "..", "models")
+models_dir = os.path.abspath(models_dir)
 confspec = {
-	"localModelPath":"string(default=/)",
+    "localModelPath": f"string(default={models_dir})",
+    "loadModelWhenInit":"boolean(default=true)"
 
-	# "logBackupMaxNumber":"integer(default=5)",
-	# "logBackup":"list(default=[])"
+
+    # "logBackupMaxNumber":"integer(default=5)",
 }
 config.conf.spec['captionLocal']=confspec
 def shootImage():
@@ -68,6 +71,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
     def __init__(self):
         super().__init__()
         self.is_model_loaded = False
+        loadModelWhenInit = config.conf['captionLocal']['loadModelWhenInit']
+        # load model when init plugin, may cause high memory useage 
+        if loadModelWhenInit:
+            threading.Thread(target=self._loadModel, daemon=True).start()
         gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(CaptionLocalSettingsPanel)
 
     
@@ -129,11 +136,50 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
         try:
             size = sys.getsizeof(self.captioner)
             del self.captioner 
-            ui.message(f"freed {size} bytes of memory")
+            ui.message("model released and memory freed")
             self.is_model_loaded = False
         except Exception as e:
-            ui.message(e)
+            ui.message(str(e))
+            raise
+
+    @scriptHandler.script(
+        description=_("open  model manager"),
+        # Translators: Category of addon in input gestures.
+        category= _("Caption Local"),
+        gesture="kb:NVDA+windows+control+,"
+    )
+    def script_openManager(self, gesture): 
+        ui.message("openning model manager...")
+        try:
+            self._openModelManager()
+
+        except Exception as e:
+            ui.message(str(e))
+            raise
+
+
+
+    def _openModelManager(self):
+        def show_manager():
+            try:
+                # 使用现有的wx.App（如果有的话）
+                app = wx.GetApp()
+                if app is None:
+                    app = wx.App()
+                
+                if not hasattr(self, 'manager_frame') or not self.manager_frame:
+                    self.manager_frame = ModelManagerFrame()
+                
+                self.manager_frame.Show()
+                self.manager_frame.Raise()
+                
+            except Exception as e:
+                ui.message(str(e))
+        
+        # 确保在主线程执行
+        wx.CallAfter(show_manager)
 
         # __gestures={
         # "kb:nvda+windows+,":"runCaption",
     # }
+

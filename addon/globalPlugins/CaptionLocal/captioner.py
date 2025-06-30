@@ -27,7 +27,7 @@ class LightweightONNXCaptioner:
             with open(config_path, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
         except FileNotFoundError:
-            raise FileNotFoundError(f"config file  {config_path} not fount, please download models and  config first!")
+            raise FileNotFoundError(f"caption model config file  {config_path} not fount, please download models and  config file first!")
         except Exception as e:
             print(e)
             raise

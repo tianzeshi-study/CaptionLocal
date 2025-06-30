@@ -104,6 +104,7 @@ def download_single_file(url: str, local_path: str, max_retries: int = 3) -> Tup
                 if content_length:
                     total_size = int(content_length)
                     print(f"[Thread-{thread_id}] File size: {total_size:,} bytes")
+
                 
                 # 写入文件
                 with open(local_path, 'wb') as f:
@@ -158,12 +159,12 @@ def download_single_file(url: str, local_path: str, max_retries: int = 3) -> Tup
     return False, f"Failed to download after {max_retries} attempts: {url}"
 
 def download_models_multithreaded(
+    models_dir: str,
     remote_host: str = "huggingface.co",
     model_name: str = "Xenova/vit-gpt2-image-captioning", 
     files_to_download: Optional[List[str]] = None,
     resolve_path: str = "/resolve/main",
     max_workers: int = 4,
-    base_path: Optional[str] = None
 ) -> Tuple[List[str], List[str]]:
     """
     多线程下载模型文件
@@ -203,8 +204,7 @@ def download_models_multithreaded(
     print(f"Remote host: {remote_host}")
     print(f"Max workers: {max_workers}")
     
-    # 确保models目录存在
-    models_dir = ensure_models_directory(base_path)
+    
     
     # 创建本地模型目录
     local_model_dir = os.path.join(models_dir, model_name)
@@ -288,8 +288,10 @@ def get_model_file_paths(model_name: str = "Xenova/vit-gpt2-image-captioning",
 # 使用示例
 if __name__ == "__main__":
     try:
+        # 确保models目录存在
+        models_dir = ensure_models_directory()
         # 下载默认模型
-        successful, failed = download_models_multithreaded()
+        successful, failed = download_models_multithreaded(models_dir)
         
         if not failed:
             print("\n🎉 All files downloaded successfully!")

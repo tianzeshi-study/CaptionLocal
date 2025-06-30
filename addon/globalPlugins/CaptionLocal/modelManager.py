@@ -380,15 +380,17 @@ class ModelManagerFrame(wx.Frame):
             self.log(f"模型名称: {self.model_name}")
             self.log(f"下载路径: {self.download_path}")
             self.log(f"文件数量: {len(self.files_to_download)}")
+            self.log("downloading... please wait")
             
             # 调用下载函数
             successful, failed = download_models_multithreaded(
+                models_dir=self.download_path,
                 remote_host=remote_host,
                 model_name=self.model_name,
                 files_to_download=self.files_to_download,
                 resolve_path=self.resolve_path,
                 max_workers=4,
-                base_path=os.path.dirname(self.download_path)
+                # base_path=os.path.dirname(self.download_path)
             )
             
             # 处理结果
