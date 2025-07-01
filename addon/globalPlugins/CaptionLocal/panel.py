@@ -56,7 +56,7 @@ class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
         self.modelPathEdit = directoryEntryControl.pathControl
         self.modelPathEdit.Value = config.conf['captionLocal']['localModelPath']
         # Translators: A setting in addon settings dialog.
-        self.loadModelWhenInit = sHelper.addItem(wx.CheckBox(self, label=_("load model when init, may cause high use of memory)")))
+        self.loadModelWhenInit = sHelper.addItem(wx.CheckBox(self, label=_("load model when init (may cause high use of memory)")))
         self.loadModelWhenInit.SetValue(config.conf['captionLocal']['loadModelWhenInit'])
 
 
@@ -81,7 +81,7 @@ class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
         # Make sure we're operating in the "normal" profile
         if config.conf.profiles[-1].name is None and len(config.conf.profiles) == 1:
 
-            config.conf['captionLocal']['localModelPath'] = self.localModelPath.GetValue()
+            config.conf['captionLocal']['localModelPath'] = self.modelPathEdit.GetValue()
             config.conf['captionLocal']['loadModelWhenInit'] = self.loadModelWhenInit.GetValue()
 
         else:

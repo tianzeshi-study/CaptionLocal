@@ -19,11 +19,9 @@ import wx
 models_dir = os.path.join(here, "..", "..", "models")
 models_dir = os.path.abspath(models_dir)
 confspec = {
-    "localModelPath": f"string(default={models_dir})",
+    "localModelPath": f"string(default={models_dir}/Xenova/vit-gpt2-image-captioning)",
     "loadModelWhenInit":"boolean(default=true)"
 
-
-    # "logBackupMaxNumber":"integer(default=5)",
 }
 config.conf.spec['captionLocal']=confspec
 def shootImage():

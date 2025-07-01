@@ -4,9 +4,12 @@ import urllib.parse
 import urllib.error
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Callable
 import threading
 import time
+
+# 定义进度回调函数的类型
+ProgressCallback = Callable[[str, int, int, float], None]  # (file_name, downloaded, total, progress_percent)
 
 def ensure_models_directory(base_path: Optional[str] = None) -> str:
     """
@@ -63,7 +66,8 @@ def construct_download_url(remote_host: str, model_name: str, file_path: str,
     url = f"{base_url}/{model_name}/{resolve_path}/{file_path}"
     return url
 
-def download_single_file(url: str, local_path: str, max_retries: int = 3) -> Tuple[bool, str]:
+def download_single_file(url: str, local_path: str, max_retries: int = 3, 
+                        progress_callback: Optional[ProgressCallback] = None) -> Tuple[bool, str]:
     """
     下载单个文件
     
@@ -71,11 +75,13 @@ def download_single_file(url: str, local_path: str, max_retries: int = 3) -> Tup
         url: 下载URL
         local_path: 本地保存路径
         max_retries: 最大重试次数
+        progress_callback: 进度回调函数
         
     Returns:
         Tuple[bool, str]: (是否成功, 错误信息或成功信息)
     """
     thread_id = threading.current_thread().ident
+    file_name = os.path.basename(local_path)
     
     # 确保本地目录存在
     local_dir = os.path.dirname(local_path)
@@ -87,6 +93,10 @@ def download_single_file(url: str, local_path: str, max_retries: int = 3) -> Tup
     # 如果文件已存在，检查是否需要重新下载
     if os.path.exists(local_path):
         print(f"[Thread-{thread_id}] File already exists: {local_path}")
+        # 文件已存在，回调100%进度
+        if progress_callback:
+            file_size = os.path.getsize(local_path)
+            progress_callback(file_name, file_size, file_size, 100.0)
         return True, f"File already exists: {local_path}"
     
     for attempt in range(max_retries):
@@ -101,15 +111,16 @@ def download_single_file(url: str, local_path: str, max_retries: int = 3) -> Tup
             with urllib.request.urlopen(req, timeout=30) as response:
                 # 获取文件大小
                 content_length = response.headers.get('Content-Length')
-                if content_length:
-                    total_size = int(content_length)
+                total_size = int(content_length) if content_length else 0
+                
+                if total_size > 0:
                     print(f"[Thread-{thread_id}] File size: {total_size:,} bytes")
-
                 
                 # 写入文件
                 with open(local_path, 'wb') as f:
                     downloaded = 0
                     chunk_size = 8192
+                    last_progress_update = 0
                     
                     while True:
                         chunk = response.read(chunk_size)
@@ -118,11 +129,27 @@ def download_single_file(url: str, local_path: str, max_retries: int = 3) -> Tup
                         f.write(chunk)
                         downloaded += len(chunk)
                         
+                        # 计算进度并调用回调函数
+                        if progress_callback and total_size > 0:
+                            progress = (downloaded / total_size) * 100
+                            # 每1%或每MB更新一次进度，避免过度频繁的回调
+                            if (downloaded - last_progress_update >= 1024 * 1024 or 
+                                abs(progress - (last_progress_update / total_size) * 100) >= 1.0 or
+                                downloaded == total_size):
+                                progress_callback(file_name, downloaded, total_size, progress)
+                                last_progress_update = downloaded
+                        
                         # 显示进度（每MB显示一次）
                         if downloaded % (1024 * 1024) == 0 or downloaded == total_size:
-                            if content_length:
+                            if total_size > 0:
                                 progress = (downloaded / total_size) * 100
                                 print(f"[Thread-{thread_id}] Progress: {progress:.1f}% ({downloaded:,}/{total_size:,} bytes)")
+                            else:
+                                print(f"[Thread-{thread_id}] Downloaded: {downloaded:,} bytes")
+                    
+                    # 确保最终进度为100%
+                    if progress_callback and total_size > 0:
+                        progress_callback(file_name, downloaded, total_size, 100.0)
             
             # 验证下载的文件
             if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
@@ -165,17 +192,19 @@ def download_models_multithreaded(
     files_to_download: Optional[List[str]] = None,
     resolve_path: str = "/resolve/main",
     max_workers: int = 4,
+    progress_callback: Optional[ProgressCallback] = None,
 ) -> Tuple[List[str], List[str]]:
     """
     多线程下载模型文件
     
     Args:
+        models_dir: 模型目录路径
         remote_host: 远程主机，默认huggingface.co
         model_name: 模型名称，默认Xenova/vit-gpt2-image-captioning
         files_to_download: 要下载的文件列表，如果为None则使用默认列表
         resolve_path: 解析路径，默认/resolve/main
         max_workers: 最大线程数，默认4
-        base_path: 基础路径，默认使用__file__的父目录
+        progress_callback: 进度回调函数，参数为(file_name, downloaded, total, progress_percent)
         
     Returns:
         Tuple[List[str], List[str]]: (成功下载的文件列表, 失败的文件列表)
@@ -204,8 +233,6 @@ def download_models_multithreaded(
     print(f"Remote host: {remote_host}")
     print(f"Max workers: {max_workers}")
     
-    
-    
     # 创建本地模型目录
     local_model_dir = os.path.join(models_dir, model_name)
     
@@ -223,7 +250,7 @@ def download_models_multithreaded(
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有下载任务
         future_to_task = {
-            executor.submit(download_single_file, url, local_path): (url, local_path, file_path)
+            executor.submit(download_single_file, url, local_path, 3, progress_callback): (url, local_path, file_path)
             for url, local_path, file_path in download_tasks
         }
         
@@ -285,13 +312,38 @@ def get_model_file_paths(model_name: str = "Xenova/vit-gpt2-image-captioning",
         'model_dir': local_model_dir
     }
 
+# 示例：进度回调函数
+def example_progress_callback(file_name: str, downloaded: int, total: int, progress_percent: float):
+    """
+    示例进度回调函数
+    
+    Args:
+        file_name: 文件名
+        downloaded: 已下载字节数
+        total: 总字节数
+        progress_percent: 进度百分比
+    """
+    print(f"[PROGRESS] {file_name}: {progress_percent:.1f}% ({downloaded:,}/{total:,} bytes)")
+
 # 使用示例
 if __name__ == "__main__":
     try:
         # 确保models目录存在
         models_dir = ensure_models_directory()
-        # 下载默认模型
-        successful, failed = download_models_multithreaded(models_dir)
+        
+        # 定义进度回调函数
+        def my_progress_callback(file_name: str, downloaded: int, total: int, progress_percent: float):
+            # 这里可以更新GUI界面的进度条
+            print(f"GUI更新: {file_name} - {progress_percent:.1f}%")
+            # 在实际GUI应用中，这里可能是：
+            # self.update_progress_bar(file_name, progress_percent)
+            # 或者发送信号到GUI主线程
+        
+        # 下载模型，传入进度回调函数
+        successful, failed = download_models_multithreaded(
+            models_dir=models_dir,
+            progress_callback=my_progress_callback
+        )
         
         if not failed:
             print("\n🎉 All files downloaded successfully!")
@@ -306,4 +358,3 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"Error: {e}")
-        
