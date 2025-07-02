@@ -7,7 +7,7 @@ import winsound  # Windows sound API for audio notifications
 
 # Assume modelDownloader.py is in the same directory
 try:
-    from modelDownloader import download_models_multithreaded, ensure_models_directory, get_model_file_paths
+    from .modelDownloader import download_models_multithreaded, ensure_models_directory, get_model_file_paths
 except ImportError as e:
     print(f"Error importing modelDownloader: {e}")
     print("Please ensure modelDownloader.py is in the same directory")

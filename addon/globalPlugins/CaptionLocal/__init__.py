@@ -1,9 +1,11 @@
 import os, sys
 here = os.path.dirname(__file__) 
-sys.path.insert(0, here)
-from  captioner import  LightweightONNXCaptioner
-from modelManager import  ModelManagerFrame
-from panel import  CaptionLocalSettingsPanel
+libs_dir = os.path.join(here, "libs")
+# sys.path.insert(0, here)
+sys.path.insert(0, libs_dir)
+from  .captioner import  LightweightONNXCaptioner
+from .modelManager import  ModelManagerFrame
+from .panel import  CaptionLocalSettingsPanel
 import base64
 import gui
 from gui import guiHelper
