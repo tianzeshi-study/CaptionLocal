@@ -151,7 +151,8 @@ class SoundNotification:
         try:
             # Play system information sound
             winsound.MessageBeep(winsound.MB_ICONASTERISK)
-        except Exception:
+        except Exception as e:
+            print(e)
             pass  # Silently fail if sound unavailable
     
     @staticmethod
@@ -160,7 +161,8 @@ class SoundNotification:
         try:
             # Play system default sound
             winsound.MessageBeep(winsound.MB_OK)
-        except Exception:
+        except Exception as e:
+            print(e)
             pass
     
     @staticmethod
@@ -169,7 +171,8 @@ class SoundNotification:
         try:
             # Play system error sound
             winsound.MessageBeep(winsound.MB_ICONHAND)
-        except Exception:
+        except Exception as e:
+            print(e)
             pass
     
     @staticmethod
@@ -178,7 +181,8 @@ class SoundNotification:
         try:
             # Play system warning sound
             winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
-        except Exception:
+        except Exception as e:
+            print(e)
             pass
 
 class ModelManagerFrame(wx.Frame):
@@ -390,6 +394,7 @@ class ModelManagerFrame(wx.Frame):
             
             self.log(f"Remote host: {remote_host}")
             self.log(f"Model name: {self.model_name}")
+            self.download_path = self.path_ctrl.GetValue()
             self.log(f"Download path: {self.download_path}")
             self.log(f"File count: {len(self.files_to_download)}")
             self.log("Downloading... please wait")
