@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 import wx
 import os
 import threading
@@ -56,7 +57,7 @@ class AdvancedSettingsDialog(wx.Dialog):
         model_sizer.Add(self.resolve_path_ctrl, 0, wx.ALL | wx.EXPAND, 5)
         
         # Use mirror
-        self.use_mirror_cb = wx.CheckBox(model_panel, label="Use HuggingFace Mirror (hf-mirror.com)")
+        self.use_mirror_cb = wx.CheckBox(model_panel, label="Use HuggingFace Mirror")
         self.use_mirror_cb.SetValue(self.use_mirror)
         model_sizer.Add(self.use_mirror_cb, 0, wx.ALL, 5)
         

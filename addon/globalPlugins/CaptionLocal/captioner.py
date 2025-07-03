@@ -1,9 +1,14 @@
+# -*- coding: UTF-8 -*-
+import os,sys 
+here = os.path.dirname(__file__) 
+libs_dir = os.path.join(here, "libs")
+sys.path.insert(0, libs_dir)
+
 import onnxruntime as ort
 import numpy as np
 from PIL import Image
 import json
 import re
-import os
 from typing import List, Dict, Union, Optional
 import io
 
@@ -13,7 +18,7 @@ class LightweightONNXCaptioner:
     不依赖 PyTorch，只使用 ONNX Runtime + 基础库
     """
 
-    def __init__(self, encoder_path: str, decoder_path: str, config_path: str):
+    def __init__(self, encoder_path: str, decoder_path: str, config_path: str, enable_profiling: bool=False):
         """
         初始化轻量级 ONNX 图像描述模型
 
@@ -42,11 +47,13 @@ class LightweightONNXCaptioner:
         # 从配置文件加载所有模型参数
         self._load_model_params()
 
-
+        so = ort.SessionOptions()
+        if enable_profiling:
+            so.enable_profiling = True  # 打开 Profiler
 
         # 加载 ONNX 模型
-        self.encoder_session = ort.InferenceSession(encoder_path)
-        self.decoder_session = ort.InferenceSession(decoder_path)
+        self.encoder_session = ort.InferenceSession(encoder_path, sess_options=so)
+        self.decoder_session = ort.InferenceSession(decoder_path, sess_options=so)
 
         print(f"Loaded ONNX models - Encoder: {encoder_path}, Decoder: {decoder_path}")
         print(f"Loaded config from: {config_path}")
@@ -198,6 +205,8 @@ class LightweightONNXCaptioner:
         image_array = image_array.astype(np.float32)
         encoder_outputs = self.encoder_session.run(None, {input_name: image_array})
 
+
+
         # 返回最后一层隐藏状态
         return encoder_outputs[0]
 
@@ -313,6 +322,7 @@ class LightweightONNXCaptioner:
             # for inp in self.decoder_session.get_inputs():
                 # print(f"name = {inp.name}, type = {inp.type}")
             decoder_outputs = self.decoder_session.run(None, decoder_inputs)
+            self.decoder_session.end_profiling()  
             logits = decoder_outputs[0]  # 形状: (batch_size, seq_len, vocab_size)
 
 
@@ -381,7 +391,8 @@ def main():
     captioner = LightweightONNXCaptioner(
         encoder_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/onnx/encoder_model_quantized.onnx",
         decoder_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/onnx/decoder_model_merged_quantized.onnx",
-        config_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/config.json"  # 必选
+        config_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/config.json",
+        enable_profiling=True
     )
 
 
@@ -389,7 +400,7 @@ def main():
     print("=== 单张图片描述 ===")
     caption1 = captioner.generate_caption(image="porridge.png")
     print(f"Greedy: {caption1}")
-    benchmark_inference(captioner, "porridge.png", 5)
+    # benchmark_inference(captioner, "porridge.png", 5)
 
 
 # 配置文件创建工具

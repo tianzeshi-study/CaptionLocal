@@ -1,8 +1,5 @@
+# -*- coding: UTF-8 -*-
 import os, sys
-here = os.path.dirname(__file__) 
-libs_dir = os.path.join(here, "libs")
-# sys.path.insert(0, here)
-sys.path.insert(0, libs_dir)
 from  .captioner import  LightweightONNXCaptioner
 from .modelManager import  ModelManagerFrame
 from .panel import  CaptionLocalSettingsPanel
@@ -18,6 +15,9 @@ import io
 import threading 
 import api
 import wx
+import addonHandler 
+addonHandler.initTranslation()
+here = os.path.dirname(__file__) 
 models_dir = os.path.join(here, "..", "..", "models")
 models_dir = os.path.abspath(models_dir)
 confspec = {

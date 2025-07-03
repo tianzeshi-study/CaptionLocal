@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 # NVDA add-on: Caption Local
 # Copyright (C) 
 # This file is covered by the GNU General Public License.

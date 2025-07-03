@@ -1,0 +1,17 @@
+addon/doc/*.css
+addon/doc/en/
+*_docHandler.py
+*.html
+manifest.ini
+*.mo
+*.pot
+*.py[co]
+*.nvda-addon
+.sconsign.dblite
+/[0-9]*.[0-9]*.[0-9]*.json
+*.back
+**.dist-info
+**.png
+addon/models
+addon/globalPlugins/CaptionLocal/libs
+**onnxruntime_profile__*.json

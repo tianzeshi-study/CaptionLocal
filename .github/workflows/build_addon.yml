@@ -1,0 +1,84 @@
+name: build addon
+
+on:
+  push:
+    tags: ["*"]
+    # To build on main/master branch, uncomment the following line:
+    branches: [ main , master ]
+
+  pull_request:
+    branches: [ main, master ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - run: echo -e "pre-commit\nscons\nmarkdown">requirements.txt
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip wheel
+        pip install -r requirements.txt
+        pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs
+        sudo apt-get update  -y
+        sudo apt-get install -y gettext
+
+    - name: Code checks
+      run: export SKIP=no-commit-to-branch; pre-commit run --all
+
+    - name: building addon
+      run: scons
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: packaged_addon
+        path: ./*.nvda-addon
+
+  upload_release:
+    runs-on: ubuntu-latest
+    environment: 
+      name: myenv
+
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    needs: ["build"]
+    steps:
+    - uses: actions/checkout@v3
+    - name: download releases files
+      uses: actions/download-artifact@v3
+    - name: Display structure of downloaded files
+      run: ls -R
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      # if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: packaged_addon/*.nvda-addon
+        fail_on_unmatched_files: true
+        # token:${{secrets.RELEASE_TOKEN}}
+        # token:  helloworld
+        make_latest: true
+        repository: tianzeshi-study/CaptionClient
+        # token: ${{ secrets.ACCESS_TOKEN }}
+        # token: ${{ secrets.RELEASE_TOKEN }}
+        prerelease: ${{ contains(github.ref, '-') }}
+        # token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+        # token: ${{ secrets.GITHUB_TOKEN }}
+        body: "new release" 
+      env:
+        # token: ${{ secrets.RELEASE_TOKEN }}
+        token: ${{ secrets.ACCESS_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 使用 GitHub 提供的默认 Token
+

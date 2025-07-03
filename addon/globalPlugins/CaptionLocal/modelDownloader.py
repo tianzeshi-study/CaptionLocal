@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 import os
 import urllib.request
 import urllib.parse
@@ -7,6 +8,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional, Tuple, Callable
 import threading
 import time
+
+import addonHandler 
+addonHandler.initTranslation()
+
 
 # 定义进度回调函数的类型
 ProgressCallback = Callable[[str, int, int, float], None]  # (file_name, downloaded, total, progress_percent)
