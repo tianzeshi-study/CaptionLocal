@@ -38,3 +38,360 @@ msgstr ""
 #: panel.py:59
 msgid "load model when init (may cause high use of memory)"
 msgstr ""
+
+#. Translators: Description for the image caption script
+#: __init__.py:137
+msgid "image caption using local model"
+msgstr ""
+
+#. Translators: Category of addon in input gestures.
+#: __init__.py:139 __init__.py:187 __init__.py:213
+msgid "Caption Local"
+msgstr ""
+
+#. Translators: Message when loading the model
+#: __init__.py:152
+msgid "loading model..."
+msgstr ""
+
+#. Translators: Message when starting image recognition
+#: __init__.py:157
+msgid "starting recognize"
+msgstr ""
+
+#. Translators: Description for the release model script
+#: __init__.py:185
+msgid "release local model"
+msgstr ""
+
+#. Translators: Message when releasing the model
+#: __init__.py:197
+msgid "releasing model..."
+msgstr ""
+
+#. Translators: Message when model is successfully released
+#: __init__.py:203
+msgid "model released and memory freed"
+msgstr ""
+
+#. Translators: Description for the open model manager script
+#: __init__.py:211
+msgid "open model manager"
+msgstr ""
+
+#. Translators: Message when opening model manager
+#: __init__.py:223
+msgid "opening model manager..."
+msgstr ""
+
+#. Translators: Logged when the local models directory is created / found.
+#: modelDownloader.py:70
+#, python-brace-format
+msgid "Models directory ensured:{modelsDir} "
+msgstr ""
+
+#. Translators: Logged when download is skipped because the file exists.
+#: modelDownloader.py:131
+#, python-brace-format
+msgid "[Thread-{threadId}] File already exists:\t {localPath}"
+msgstr ""
+
+#: modelDownloader.py:138
+msgid ""
+"[Thread-{threadId}] Downloading (attempt {attempt + 1}/{maxRetries}): {url}"
+msgstr ""
+
+#: modelDownloader.py:147
+msgid "[Thread-{id}] File size: {size:,} bytes"
+msgstr ""
+
+#: modelDownloader.py:182
+#, python-brace-format
+msgid "[Thread-{id}] Successfully downloaded: "
+msgstr ""
+
+#: modelDownloader.py:239
+msgid ""
+"Starting download of {len(filesToDownload)} files for model: {modelName}\n"
+"Remote host: {remoteHost}\n"
+"Max workers: {maxWorkers}"
+msgstr ""
+
+#. Translators: A message presented in the settings panel
+#: modelManager.py:49
+msgid "Advanced Settings"
+msgstr ""
+
+#. Translators: Label for model name input field
+#: modelManager.py:78
+msgid "Model Name:"
+msgstr ""
+
+#. Translators: Label for resolve path input field
+#: modelManager.py:84
+msgid "Resolve Path:"
+msgstr ""
+
+#. Translators: Checkbox label for using HuggingFace mirror
+#: modelManager.py:90
+msgid "Use HuggingFace Mirror"
+msgstr ""
+
+#. Translators: Tab label for model configuration
+#: modelManager.py:96
+msgid "Model Config"
+msgstr ""
+
+#. Translators: Label for file list section
+#: modelManager.py:103
+msgid "Files to Download:"
+msgstr ""
+
+#. Translators: Button label for adding a file
+#: modelManager.py:116 modelManager.py:156
+msgid "Add File"
+msgstr ""
+
+#. Translators: Button label for removing a file
+#: modelManager.py:118
+msgid "Remove File"
+msgstr ""
+
+#. Translators: Tab label for file list
+#: modelManager.py:125
+msgid "File List"
+msgstr ""
+
+#. Translators: OK button text
+#: modelManager.py:132
+msgid "OK"
+msgstr ""
+
+#. Translators: Cancel button text
+#: modelManager.py:134
+msgid "Cancel"
+msgstr ""
+
+#. Translators: Dialog title for adding a file
+#. Translators: Prompt text for entering file path
+#: modelManager.py:156
+msgid "Enter file path:"
+msgstr ""
+
+#. Translators: Main window title
+#: modelManager.py:255
+msgid "Model Manager"
+msgstr ""
+
+#. Translators: Main application title text
+#: modelManager.py:287
+msgid "Model Download Manager"
+msgstr ""
+
+#. Translators: Group box label for download settings
+#: modelManager.py:296
+msgid "Download Settings"
+msgstr ""
+
+#. Translators: Label for download path field
+#: modelManager.py:300
+msgid "Download Path:"
+msgstr ""
+
+#. Translators: Group box label for model information
+#: modelManager.py:314
+msgid "Model Information"
+msgstr ""
+
+#. Translators: Model name display format
+#: modelManager.py:317 modelManager.py:470
+#, python-brace-format
+msgid "Model: {modelName}"
+msgstr ""
+
+#. Translators: File count display format
+#: modelManager.py:321 modelManager.py:472
+#, python-brace-format
+msgid "File Count: {count}"
+msgstr ""
+
+#. Translators: Button label for advanced settings
+#: modelManager.py:330
+msgid "Advanced Settings..."
+msgstr ""
+
+#. Translators: Button label for starting download
+#: modelManager.py:336
+msgid "Start Download"
+msgstr ""
+
+#. Translators: Initial status text
+#: modelManager.py:345
+msgid "Ready"
+msgstr ""
+
+#. Translators: Group box label for download log
+#: modelManager.py:350
+msgid "Download Log"
+msgstr ""
+
+#. Translators: Log message for default path initialization
+#: modelManager.py:365
+#, python-brace-format
+msgid "Default download path: {path}"
+msgstr ""
+
+#. Translators: Log message for path initialization failure
+#: modelManager.py:368
+#, python-brace-format
+msgid "Failed to initialize path: {error}"
+msgstr ""
+
+#. Translators: Progress log message format
+#: modelManager.py:435
+#, python-brace-format
+msgid "file: {fileName}  progress: {progress:.2f}%"
+msgstr ""
+
+#. Translators: Directory selection dialog title
+#: modelManager.py:445
+msgid "Select Download Directory"
+msgstr ""
+
+#. Translators: Log message for path change
+#: modelManager.py:450
+#, python-brace-format
+msgid "Download path changed to: {path}"
+msgstr ""
+
+#. Translators: Mirror usage indicator
+#: modelManager.py:475
+msgid " (using mirror)"
+msgstr ""
+
+#. Translators: Settings update log message
+#: modelManager.py:477
+#, python-brace-format
+msgid "Settings updated: {modelName}{mirrorInfo}, {count} files"
+msgstr ""
+
+#. Translators: Log message when download is already in progress
+#: modelManager.py:490
+msgid "Download in progress..."
+msgstr ""
+
+#. Translators: Error message for no files selected
+#: modelManager.py:497
+msgid "❌ Error: Please select files to download in Advanced Settings"
+msgstr ""
+
+#. Translators: Status message for no files selected
+#: modelManager.py:499
+msgid "Error: No files selected"
+msgstr ""
+
+#. Translators: Status message during download
+#: modelManager.py:518
+msgid "Downloading..."
+msgstr ""
+
+#. Translators: Log message for download start
+#: modelManager.py:520
+msgid "Starting model file download..."
+msgstr ""
+
+#. Translators: Log message for remote host
+#: modelManager.py:526
+#, python-brace-format
+msgid "Remote host: {host}"
+msgstr ""
+
+#. Translators: Log message for model name
+#: modelManager.py:528
+#, python-brace-format
+msgid "Model name: {name}"
+msgstr ""
+
+#. Translators: Log message for download path
+#: modelManager.py:531
+#, python-brace-format
+msgid "Download path: {path}"
+msgstr ""
+
+#. Translators: Log message for file count
+#: modelManager.py:533
+#, python-brace-format
+msgid "File count: {count}"
+msgstr ""
+
+#. Translators: Log message for download progress
+#: modelManager.py:535
+msgid "Downloading... please wait"
+msgstr ""
+
+#. Translators: Log message for download error
+#: modelManager.py:557
+#, python-brace-format
+msgid "Error during download: {error}"
+msgstr ""
+
+#. Translators: Status message for download failure
+#: modelManager.py:559 modelManager.py:589
+msgid "Download failed"
+msgstr ""
+
+#. Translators: Success message for all files downloaded
+#: modelManager.py:576
+#, python-brace-format
+msgid "✅ All files downloaded successfully! ({success}/{total})"
+msgstr ""
+
+#. Translators: Status message for completed download
+#: modelManager.py:579
+msgid "Download completed"
+msgstr ""
+
+#. Translators: Error message for all files failed
+#: modelManager.py:584
+#, python-brace-format
+msgid "❌ All files download failed! ({failed}/{total})"
+msgstr ""
+
+#. Translators: Log message for failed files list
+#: modelManager.py:587
+#, python-brace-format
+msgid "Failed files: {files}"
+msgstr ""
+
+#. Translators: Warning message for partial download success
+#: modelManager.py:594
+#, python-brace-format
+msgid "⚠️ Partial download success ({success}/{total})"
+msgstr ""
+
+#. Translators: Log message for successful files count
+#: modelManager.py:597
+#, python-brace-format
+msgid "Successful: {count} files"
+msgstr ""
+
+#. Translators: Log message for failed files count and list
+#: modelManager.py:599
+#, python-brace-format
+msgid "Failed: {count} files - {files}"
+msgstr ""
+
+#. Translators: Status message for partial completion
+#: modelManager.py:602
+msgid "Partially completed"
+msgstr ""
+
+#. Translators: Confirmation dialog message for exit during download
+#. Translators: Confirmation dialog title for exit
+#: modelManager.py:619
+msgid "Download is in progress. Are you sure you want to exit?"
+msgstr ""
+
+#: modelManager.py:620
+msgid "Confirm Exit"
+msgstr ""

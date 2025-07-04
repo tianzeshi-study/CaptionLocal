@@ -1,365 +1,333 @@
 # -*- coding: UTF-8 -*-
+"""
+Multi‑threaded model downloader
+==============================
+
+Download ONNX / tokenizer assets from *Hugging Face* (or any HTTP host)
+with progress callbacks.
+
+Run this file directly for a CLI demonstration.
+
+Example
+-------
+.. code:: bash
+
+	python download_models.py  # will download to ``models`` sibling dir
+"""
+
+from __future__ import annotations
+
 import os
-import urllib.request
-import urllib.parse
-import urllib.error
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional, Tuple, Callable
 import threading
 import time
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import Callable
 
-import addonHandler 
-addonHandler.initTranslation()
+try:
+	import addonHandler
+	addonHandler.initTranslation()
+except:
+	_ = format
+	pass
 
 
-# 定义进度回调函数的类型
-ProgressCallback = Callable[[str, int, int, float], None]  # (file_name, downloaded, total, progress_percent)
+_: Callable[[str], str]	 # translation alias injected by NVDA
 
-def ensure_models_directory(base_path: Optional[str] = None) -> str:
-    """
-    确保models目录存在，如果不存在则创建
-    
-    Args:
-        base_path: 基础路径，默认使用__file__的父目录
-        
-    Returns:
-        str: models目录的绝对路径
-        
-    Raises:
-        OSError: 创建目录失败时抛出异常
-    """
-    if base_path is None:
-        here = os.path.dirname(__file__)
-    else:
-        here = base_path
-        
-    models_dir = os.path.join(here, "..", "..", "models")
-    models_dir = os.path.abspath(models_dir)
-    
-    try:
-        Path(models_dir).mkdir(parents=True, exist_ok=True)
-        print(f"Models directory ensured: {models_dir}")
-        return models_dir
-    except OSError as e:
-        raise OSError(f"Failed to create models directory {models_dir}: {e}")
+# --------------------------------------------------------------------------- #
+# Type Aliases & Constants
+# --------------------------------------------------------------------------- #
 
-def construct_download_url(remote_host: str, model_name: str, file_path: str, 
-                          resolve_path: str = "/resolve/main") -> str:
-    """
-    构造下载URL
-    
-    Args:
-        remote_host: 远程主机地址
-        model_name: 模型名称
-        file_path: 文件路径
-        resolve_path: 解析路径，默认为/resolve/main
-        
-    Returns:
-        str: 完整的下载URL
-    """
-    # 确保所有路径组件都正确格式化
-    if not remote_host.startswith(('http://', 'https://')):
-        remote_host = f"https://{remote_host}"
-    
-    # 移除多余的斜杠并构造URL
-    base_url = remote_host.rstrip('/')
-    model_name = model_name.strip('/')
-    resolve_path = resolve_path.strip('/')
-    file_path = file_path.lstrip('/')
-    
-    url = f"{base_url}/{model_name}/{resolve_path}/{file_path}"
-    return url
+# (fileName, downloadedBytes, totalBytes, progressPercent)
+ProgressCallback = Callable[[str, int, int, float], None]
 
-def download_single_file(url: str, local_path: str, max_retries: int = 3, 
-                        progress_callback: Optional[ProgressCallback] = None) -> Tuple[bool, str]:
-    """
-    下载单个文件
-    
-    Args:
-        url: 下载URL
-        local_path: 本地保存路径
-        max_retries: 最大重试次数
-        progress_callback: 进度回调函数
-        
-    Returns:
-        Tuple[bool, str]: (是否成功, 错误信息或成功信息)
-    """
-    thread_id = threading.current_thread().ident
-    file_name = os.path.basename(local_path)
-    
-    # 确保本地目录存在
-    local_dir = os.path.dirname(local_path)
-    try:
-        Path(local_dir).mkdir(parents=True, exist_ok=True)
-    except OSError as e:
-        return False, f"Failed to create directory {local_dir}: {e}"
-    
-    # 如果文件已存在，检查是否需要重新下载
-    if os.path.exists(local_path):
-        print(f"[Thread-{thread_id}] File already exists: {local_path}")
-        # 文件已存在，回调100%进度
-        if progress_callback:
-            file_size = os.path.getsize(local_path)
-            progress_callback(file_name, file_size, file_size, 100.0)
-        return True, f"File already exists: {local_path}"
-    
-    for attempt in range(max_retries):
-        try:
-            print(f"[Thread-{thread_id}] Downloading (attempt {attempt + 1}/{max_retries}): {url}")
-            
-            # 创建请求对象并设置User-Agent
-            req = urllib.request.Request(url)
-            req.add_header('User-Agent', 'Mozilla/5.0 (Python urllib)')
-            
-            # 下载文件
-            with urllib.request.urlopen(req, timeout=30) as response:
-                # 获取文件大小
-                content_length = response.headers.get('Content-Length')
-                total_size = int(content_length) if content_length else 0
-                
-                if total_size > 0:
-                    print(f"[Thread-{thread_id}] File size: {total_size:,} bytes")
-                
-                # 写入文件
-                with open(local_path, 'wb') as f:
-                    downloaded = 0
-                    chunk_size = 8192
-                    last_progress_update = 0
-                    
-                    while True:
-                        chunk = response.read(chunk_size)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        
-                        # 计算进度并调用回调函数
-                        if progress_callback and total_size > 0:
-                            progress = (downloaded / total_size) * 100
-                            # 每1%或每MB更新一次进度，避免过度频繁的回调
-                            if (downloaded - last_progress_update >= 1024 * 1024 or 
-                                abs(progress - (last_progress_update / total_size) * 100) >= 1.0 or
-                                downloaded == total_size):
-                                progress_callback(file_name, downloaded, total_size, progress)
-                                last_progress_update = downloaded
-                        
-                        # 显示进度（每MB显示一次）
-                        if downloaded % (1024 * 1024) == 0 or downloaded == total_size:
-                            if total_size > 0:
-                                progress = (downloaded / total_size) * 100
-                                print(f"[Thread-{thread_id}] Progress: {progress:.1f}% ({downloaded:,}/{total_size:,} bytes)")
-                            else:
-                                print(f"[Thread-{thread_id}] Downloaded: {downloaded:,} bytes")
-                    
-                    # 确保最终进度为100%
-                    if progress_callback and total_size > 0:
-                        progress_callback(file_name, downloaded, total_size, 100.0)
-            
-            # 验证下载的文件
-            if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
-                success_msg = f"Successfully downloaded: {local_path}"
-                print(f"[Thread-{thread_id}] {success_msg}")
-                return True, success_msg
-            else:
-                raise Exception("Downloaded file is empty or doesn't exist")
-                
-        except urllib.error.HTTPError as e:
-            error_msg = f"HTTP Error {e.code}: {e.reason} for URL: {url}"
-            print(f"[Thread-{thread_id}] {error_msg}")
-            if e.code == 404:
-                return False, f"File not found (404): {url}"
-            if attempt == max_retries - 1:
-                return False, error_msg
-        except urllib.error.URLError as e:
-            error_msg = f"URL Error: {e.reason} for URL: {url}"
-            print(f"[Thread-{thread_id}] {error_msg}")
-            if attempt == max_retries - 1:
-                return False, error_msg
-        except Exception as e:
-            error_msg = f"Unexpected error: {e} for URL: {url}"
-            print(f"[Thread-{thread_id}] {error_msg}")
-            if attempt == max_retries - 1:
-                return False, error_msg
-        
-        # 重试前等待
-        if attempt < max_retries - 1:
-            wait_time = 2 ** attempt  # 指数退避
-            print(f"[Thread-{thread_id}] Waiting {wait_time} seconds before retry...")
-            time.sleep(wait_time)
-    
-    return False, f"Failed to download after {max_retries} attempts: {url}"
+CHUNK_SIZE: int = 8_192
+MAX_RETRIES: int = 3
+BACKOFF_BASE: int = 2
 
-def download_models_multithreaded(
-    models_dir: str,
-    remote_host: str = "huggingface.co",
-    model_name: str = "Xenova/vit-gpt2-image-captioning", 
-    files_to_download: Optional[List[str]] = None,
-    resolve_path: str = "/resolve/main",
-    max_workers: int = 4,
-    progress_callback: Optional[ProgressCallback] = None,
-) -> Tuple[List[str], List[str]]:
-    """
-    多线程下载模型文件
-    
-    Args:
-        models_dir: 模型目录路径
-        remote_host: 远程主机，默认huggingface.co
-        model_name: 模型名称，默认Xenova/vit-gpt2-image-captioning
-        files_to_download: 要下载的文件列表，如果为None则使用默认列表
-        resolve_path: 解析路径，默认/resolve/main
-        max_workers: 最大线程数，默认4
-        progress_callback: 进度回调函数，参数为(file_name, downloaded, total, progress_percent)
-        
-    Returns:
-        Tuple[List[str], List[str]]: (成功下载的文件列表, 失败的文件列表)
-        
-    Raises:
-        ValueError: 参数无效时抛出
-        OSError: 目录操作失败时抛出
-    """
-    # 验证参数
-    if not remote_host or not model_name:
-        raise ValueError("remote_host and model_name cannot be empty")
-    
-    # 默认文件列表
-    if files_to_download is None:
-        files_to_download = [
-            "onnx/encoder_model_quantized.onnx",
-            "onnx/decoder_model_merged_quantized.onnx", 
-            "config.json",
-            "vocab.json"
-        ]
-    
-    if not files_to_download:
-        raise ValueError("files_to_download cannot be empty")
-    
-    print(f"Starting download of {len(files_to_download)} files for model: {model_name}")
-    print(f"Remote host: {remote_host}")
-    print(f"Max workers: {max_workers}")
-    
-    # 创建本地模型目录
-    local_model_dir = os.path.join(models_dir, model_name)
-    
-    # 准备下载任务
-    download_tasks = []
-    for file_path in files_to_download:
-        url = construct_download_url(remote_host, model_name, file_path, resolve_path)
-        local_path = os.path.join(local_model_dir, file_path)
-        download_tasks.append((url, local_path, file_path))
-    
-    successful_downloads = []
-    failed_downloads = []
-    
-    # 使用线程池执行下载
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交所有下载任务
-        future_to_task = {
-            executor.submit(download_single_file, url, local_path, 3, progress_callback): (url, local_path, file_path)
-            for url, local_path, file_path in download_tasks
-        }
-        
-        # 处理完成的任务
-        for future in as_completed(future_to_task):
-            url, local_path, file_path = future_to_task[future]
-            try:
-                success, message = future.result()
-                if success:
-                    successful_downloads.append(file_path)
-                    print(f"✓ Success: {file_path}")
-                else:
-                    failed_downloads.append(file_path)
-                    print(f"✗ Failed: {file_path} - {message}")
-            except Exception as e:
-                failed_downloads.append(file_path)
-                print(f"✗ Exception for {file_path}: {e}")
-    
-    # 打印下载摘要
-    print(f"\n=== Download Summary ===")
-    print(f"Total files: {len(files_to_download)}")
-    print(f"Successful: {len(successful_downloads)}")
-    print(f"Failed: {len(failed_downloads)}")
-    
-    if successful_downloads:
-        print(f"\nSuccessful downloads:")
-        for file_path in successful_downloads:
-            print(f"  ✓ {file_path}")
-    
-    if failed_downloads:
-        print(f"\nFailed downloads:")
-        for file_path in failed_downloads:
-            print(f"  ✗ {file_path}")
-    
-    print(f"\nLocal model directory: {local_model_dir}")
-    
-    return successful_downloads, failed_downloads
 
-def get_model_file_paths(model_name: str = "Xenova/vit-gpt2-image-captioning", 
-                        base_path: Optional[str] = None) -> dict:
-    """
-    获取模型文件的本地路径
-    
-    Args:
-        model_name: 模型名称
-        base_path: 基础路径，默认使用__file__的父目录
-        
-    Returns:
-        dict: 包含各个文件路径的字典
-    """
-    models_dir = ensure_models_directory(base_path)
-    local_model_dir = os.path.join(models_dir, model_name)
-    
-    return {
-        'encoder_path': os.path.join(local_model_dir, "onnx", "encoder_model_quantized.onnx"),
-        'decoder_path': os.path.join(local_model_dir, "onnx", "decoder_model_merged_quantized.onnx"),
-        'config_path': os.path.join(local_model_dir, "config.json"),
-        'vocab_path': os.path.join(local_model_dir, "vocab.json"),
-        'model_dir': local_model_dir
-    }
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
 
-# 示例：进度回调函数
-def example_progress_callback(file_name: str, downloaded: int, total: int, progress_percent: float):
-    """
-    示例进度回调函数
-    
-    Args:
-        file_name: 文件名
-        downloaded: 已下载字节数
-        total: 总字节数
-        progress_percent: 进度百分比
-    """
-    print(f"[PROGRESS] {file_name}: {progress_percent:.1f}% ({downloaded:,}/{total:,} bytes)")
 
-# 使用示例
+def ensureModelsDirectory(basePath: str | None = None) -> str:
+	"""
+	Ensure the *models* directory exists (``../../models`` relative to *basePath*).
+
+	:param basePath: Base folder; defaults to the directory containing *this* file.
+	:return: Absolute path of the *models* directory.
+	:raises OSError: When the directory cannot be created.
+	"""
+	here = basePath or os.path.dirname(__file__)
+	modelsDir = os.path.abspath(os.path.join(here, "..", "..", "models"))
+
+	try:
+		Path(modelsDir).mkdir(parents=True, exist_ok=True)
+		# Translators: Logged when the local models directory is created / found.
+		_(f"Models directory ensured:{modelsDir} ")
+		return modelsDir
+	except OSError as err:
+		raise OSError(f"Failed to create models directory {modelsDir}: {err}") from err
+
+
+def constructDownloadUrl(
+	remoteHost: str,
+	modelName: str,
+	filePath: str,
+	resolvePath: str = "/resolve/main",
+) -> str:
+	"""
+	Construct a full download URL for *Hugging Face‑style* repositories.
+
+	:param remoteHost: ``huggingface.co`` or other HTTP(S) host.
+	:param modelName: Model repository name, e.g. ``Xenova/vit-gpt2-image-captioning``.
+	:param filePath: Path inside the repo.
+	:param resolvePath: The branch / ref path, default ``/resolve/main``.
+	"""
+	if not remoteHost.startswith(("http://", "https://")):
+		remoteHost = f"https://{remoteHost}"
+
+	base = remoteHost.rstrip("/")
+	model = modelName.strip("/")
+	ref = resolvePath.strip("/")
+	filePath = filePath.lstrip("/")
+
+	return f"{base}/{model}/{ref}/{filePath}"
+
+
+def downloadSingleFile(
+	url: str,
+	localPath: str,
+	maxRetries: int = MAX_RETRIES,
+	progressCallback: ProgressCallback | None = None,
+) -> tuple[bool, str]:
+	"""
+	Download a single file with basic exponential back‑off retry strategy.
+
+	:param url: Remote URL.
+	:param localPath: Destination path.
+	:param maxRetries: Attempt count before failing.
+	:param progressCallback: Optional progress reporter.
+	:return: ``(success, message)``
+	"""
+	threadId = threading.current_thread().ident or 0
+	fileName = os.path.basename(localPath)
+
+	# Create destination directory
+	try:
+		Path(os.path.dirname(localPath)).mkdir(parents=True, exist_ok=True)
+	except OSError as err:
+		return False, f"Failed to create directory {localPath}: {err}"
+
+	# Skip if already present
+	if os.path.exists(localPath):
+		if progressCallback:
+			size = os.path.getsize(localPath)
+			progressCallback(fileName, size, size, 100.0)
+		# Translators: Logged when download is skipped because the file exists.
+		_("[Thread-{threadId}] File already exists:	 {localPath}")
+		return True, f"File already exists: {localPath}"
+
+	for attempt in range(maxRetries):
+		try:
+			# Translators: Logged at the start of each download attempt.
+			print(
+				_(f"[Thread-{threadId}] Downloading (attempt {attempt + 1}/{maxRetries}): {url}")
+			)
+
+			req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+			with urllib.request.urlopen(req, timeout=30) as resp:
+				total = int(resp.headers.get("Content-Length", "0"))
+				if total:
+					# Translators: Logged once file size is known.
+					print(
+						_("[Thread-{id}] File size: {size:,} bytes").format(
+							id=threadId, size=total
+						)
+					)
+
+				downloaded = 0
+				lastReported = 0
+
+				with open(localPath, "wb") as fh:
+					while True:
+						chunk = resp.read(CHUNK_SIZE)
+						if not chunk:
+							break
+						fh.write(chunk)
+						downloaded += len(chunk)
+
+						if progressCallback and total:
+							percent = downloaded / total * 100
+							if (
+								downloaded - lastReported >= 1_048_576	# 1 MiB
+								or abs(percent - lastReported / total * 100) >= 1.0
+								or downloaded == total
+							):
+								progressCallback(
+									fileName, downloaded, total, percent
+								)
+								lastReported = downloaded
+
+				if progressCallback and total:
+					progressCallback(fileName, downloaded, total, 100.0)
+
+			# Verify
+			if os.path.getsize(localPath) > 0:
+				# Translators: Logged when a file finishes downloading.
+				print(
+					_("[Thread-{id}] Successfully downloaded: ").format(id=threadId)
+					+ localPath
+				)
+				return True, "Download completed"
+			raise RuntimeError("Downloaded file is empty")
+
+		except urllib.error.HTTPError as err:
+			msg = f"HTTP {err.code}: {err.reason}"
+		except urllib.error.URLError as err:
+			msg = f"URL Error: {err.reason}"
+		except Exception as err:  # noqa: BLE001
+			msg = f"Unexpected error: {err}"
+		# Failure handling / retry
+		print(f"[Thread-{threadId}] {msg} – {url}")
+		if attempt < maxRetries - 1:
+			wait = BACKOFF_BASE**attempt
+			print(f"[Thread-{threadId}] Waiting {wait}s before retry…")
+			time.sleep(wait)
+		else:
+			return False, msg
+	return False, "Unreachable"
+
+
+def downloadModelsMultithreaded(
+	modelsDir: str,
+	remoteHost: str = "huggingface.co",
+	modelName: str = "Xenova/vit-gpt2-image-captioning",
+	filesToDownload: list[str] | None = None,
+	resolvePath: str = "/resolve/main",
+	maxWorkers: int = 4,
+	progressCallback: ProgressCallback | None = None,
+) -> tuple[list[str], list[str]]:
+	"""
+	Download multiple model assets concurrently.
+
+	:param modelsDir: Base *models* directory.
+	:param remoteHost: Hostname (default ``huggingface.co``).
+	:param modelName: Repository name.
+	:param filesToDownload: Explicit file list; *None* uses common defaults.
+	:param resolvePath: Branch / ref path.
+	:param maxWorkers: Thread pool size.
+	:param progressCallback: Optional reporter.
+	:return: ``(successfulPaths, failedPaths)``
+	"""
+	if not remoteHost or not modelName:
+		raise ValueError("remoteHost and modelName cannot be empty")
+
+	filesToDownload = filesToDownload or [
+		"onnx/encoder_model_quantized.onnx",
+		"onnx/decoder_model_merged_quantized.onnx",
+		"config.json",
+		"vocab.json",
+	]
+	if not filesToDownload:
+		raise ValueError("filesToDownload cannot be empty")
+
+
+	print(_(f"Starting download of {len(filesToDownload)} files for model: {modelName}\nRemote host: {remoteHost}\nMax workers: {maxWorkers}"))
+	
+
+	localModelDir = os.path.join(modelsDir, modelName)
+	successful: list[str] = []
+	failed: list[str] = []
+
+	with ThreadPoolExecutor(max_workers=maxWorkers) as executor:
+		taskMap = {
+			executor.submit(
+				downloadSingleFile,
+				constructDownloadUrl(remoteHost, modelName, path, resolvePath),
+				os.path.join(localModelDir, path),
+				MAX_RETRIES,
+				progressCallback,
+			): path
+			for path in filesToDownload
+		}
+
+		for future in as_completed(taskMap):
+			filePath = taskMap[future]
+			try:
+				ok, _msg = future.result()
+				if ok:
+					successful.append(filePath)
+					print("✓ " + filePath)
+				else:
+					failed.append(filePath)
+					print("✗ " + filePath)
+			except Exception as err:  # noqa: BLE001
+				failed.append(filePath)
+				print(f"✗ {filePath} – {err}")
+
+	# Summary
+	print("\n=== Download Summary ===")
+	print(f"Total: {len(filesToDownload)}")
+	print(f"Successful: {len(successful)}")
+	print(f"Failed: {len(failed)}")
+	print(f"\nLocal model directory: {localModelDir}")
+
+	return successful, failed
+
+
+def getModelFilePaths(
+	modelName: str = "Xenova/vit-gpt2-image-captioning",
+	basePath: str | None = None,
+) -> dict[str, str]:
+	"""
+	Return absolute paths for encoder / decoder / config / vocab.
+
+	:param modelName: Repository name.
+	:param basePath: Base folder for *models*.
+	"""
+	modelsDir = ensureModelsDirectory(basePath)
+	local = os.path.join(modelsDir, modelName)
+	return {
+		"encoderPath": os.path.join(local, "onnx", "encoder_model_quantized.onnx"),
+		"decoderPath": os.path.join(local, "onnx", "decoder_model_merged_quantized.onnx"),
+		"configPath": os.path.join(local, "config.json"),
+		"vocabPath": os.path.join(local, "vocab.json"),
+		"modelDir": local,
+	}
+
+
+# --------------------------------------------------------------------------- #
+# CLI Demo
+# --------------------------------------------------------------------------- #
+
+
+def _exampleProgress(fileName: str, done: int, total: int, pct: float) -> None:
+	"""
+	Simple CLI progress reporter.
+	"""
+	print(f"[PROGRESS] {fileName}: {pct:5.1f}% ({done:,}/{total:,} B)")
+
+
+def main() -> None:	 # pragma: no cover – CLI only
+	"""
+	Download the default model when executed as a script.
+	"""
+	modelsDir = ensureModelsDirectory()
+	ok, failed = downloadModelsMultithreaded(
+		modelsDir=modelsDir,
+		progressCallback=_exampleProgress,
+	)
+	if not failed:
+		print("\n🎉	All files downloaded successfully!")
+		for k, v in getModelFilePaths().items():
+			print(f"{k}: {v}")
+	else:
+		print("\n⚠️	 Some files failed to download:", failed)
+
+
 if __name__ == "__main__":
-    try:
-        # 确保models目录存在
-        models_dir = ensure_models_directory()
-        
-        # 定义进度回调函数
-        def my_progress_callback(file_name: str, downloaded: int, total: int, progress_percent: float):
-            # 这里可以更新GUI界面的进度条
-            print(f"GUI更新: {file_name} - {progress_percent:.1f}%")
-            # 在实际GUI应用中，这里可能是：
-            # self.update_progress_bar(file_name, progress_percent)
-            # 或者发送信号到GUI主线程
-        
-        # 下载模型，传入进度回调函数
-        successful, failed = download_models_multithreaded(
-            models_dir=models_dir,
-            progress_callback=my_progress_callback
-        )
-        
-        if not failed:
-            print("\n🎉 All files downloaded successfully!")
-            
-            # 获取文件路径
-            paths = get_model_file_paths()
-            print(f"\nModel file paths:")
-            for key, path in paths.items():
-                print(f"  {key}: {path}")
-        else:
-            print(f"\n⚠️  Some files failed to download: {failed}")
-            
-    except Exception as e:
-        print(f"Error: {e}")
+	main()
