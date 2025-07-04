@@ -454,7 +454,9 @@ def main() -> None:
 
 	print("=== Single Image Caption ===")
 	caption1 = captioner.generate_caption(image="porridge.png")
-	print(f"Greedy: {caption1}")
+	print(f"result: {caption1}")
+	benchmarkInference(captioner=captioner, imagePath="porridge.png")
+
 
 
 if __name__ == "__main__":
