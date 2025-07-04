@@ -10,6 +10,7 @@ import os.path
 import zipfile
 import sys
 
+os.environ["PATH"] = os.path.abspath("./bin") + os.pathsep + os.environ.get("PATH", "")
 # While names imported below are available by default in every SConscript
 # Linters aren't aware about them.
 # To avoid Flake8 F821 warnings about them they are imported explicitly.
