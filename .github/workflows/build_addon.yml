@@ -19,7 +19,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - run: echo -e "pre-commit\nscons\nmarkdown">requirements.txt
+    # - run: echo -e "pre-commit\nscons\nmarkdown">requirements.txt
+    - run: (echo pre-commit & echo scons & echo markdown) > requirements.txt
 
     - name: Set up Python
       uses: actions/setup-python@v4
