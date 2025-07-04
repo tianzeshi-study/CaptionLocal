@@ -4,3 +4,6 @@
 ###### Requirements for automated lint ######
 flake8 ~= 3.7.7
 flake8-tabs == 2.1.0
+pre-commit
+scons
+markdown
