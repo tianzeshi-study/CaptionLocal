@@ -343,6 +343,7 @@ class ImageCaptioner:
 			# Add past_key_values to inputs
 			decoderInputs.update(pastKeyValues)
 
+
 			# Run decoder
 			decoderOutputs = self.decoderSession.run(None, decoderInputs)
 			logits = decoderOutputs[0]  # Shape: (batch_size, seq_len, vocab_size)
@@ -369,6 +370,7 @@ class ImageCaptioner:
 				break
 
 		# Decode generated text
+		print(generatedTokens)
 		return self.decodeTokens(generatedTokens)
 
 	def _softmax(self, x: np.ndarray) -> np.ndarray:
@@ -406,20 +408,8 @@ class ImageCaptioner:
 		return caption
 
 
-def createConfigFile(configDict: dict, savePath: str = "config.json") -> None:
-	"""Create configuration file.
-
-	Args:
-		configDict: Configuration dictionary.
-		savePath: Path to save the configuration file.
-	"""
-	with open(savePath, 'w', encoding='utf-8') as f:
-		json.dump(configDict, f, indent=2, ensure_ascii=False)
-	print(f"Config saved to {savePath}")
-
-
 def benchmarkInference(captioner: ImageCaptioner, 
-					   imagePath: str, numRuns: int = 10) -> None:
+					   imagePath: str, numRuns: int = 5) -> None:
 	"""Benchmark inference performance.
 
 	Args:
@@ -446,16 +436,17 @@ def main() -> None:
 	"""Main function example."""
 	# Initialize model - config_path is now required
 	captioner = ImageCaptioner(
-		encoder_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/onnx/encoder_model_quantized.onnx",
-		decoder_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/onnx/decoder_model_merged_quantized.onnx",
-		config_path="D:/mypython/aitest/vlm/Xenova/vit-gpt2-image-captioning/config.json",
+		encoder_path="../../models/Xenova/vit-gpt2-image-captioning/onnx/encoder_model_quantized.onnx",
+		decoder_path="../../models/Xenova/vit-gpt2-image-captioning/onnx/decoder_model_merged_quantized.onnx",
+		config_path="../../models/Xenova/vit-gpt2-image-captioning/config.json",
 		enableProfiling=True
 	)
 
 	print("=== Single Image Caption ===")
-	caption1 = captioner.generate_caption(image="porridge.png")
+	imagePath = input("enter path of image to generate caption ")
+	caption1 = captioner.generate_caption(image=imagePath)
 	print(f"result: {caption1}")
-	benchmarkInference(captioner=captioner, imagePath="porridge.png")
+	# benchmarkInference(captioner=captioner, imagePath=imagePath)
 
 
 

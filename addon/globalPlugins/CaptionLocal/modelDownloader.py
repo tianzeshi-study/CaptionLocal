@@ -105,8 +105,7 @@ def downloadSingleFile(
 	progressCallback: ProgressCallback | None = None,
 ) -> tuple[bool, str]:
 	"""
-	Download a single file with basic exponential back‑off retry strategy.
-
+	Download a single file with basic exponential back‑off retry strategy and resume support.
 	:param url: Remote URL.
 	:param localPath: Destination path.
 	:param maxRetries: Attempt count before failing.
@@ -115,83 +114,138 @@ def downloadSingleFile(
 	"""
 	threadId = threading.current_thread().ident or 0
 	fileName = os.path.basename(localPath)
-
+	
 	# Create destination directory
 	try:
 		Path(os.path.dirname(localPath)).mkdir(parents=True, exist_ok=True)
 	except OSError as err:
 		return False, f"Failed to create directory {localPath}: {err}"
-
-	# Skip if already present
+	
+	# Check if file already exists and is complete
 	if os.path.exists(localPath):
-		if progressCallback:
-			size = os.path.getsize(localPath)
-			progressCallback(fileName, size, size, 100.0)
-		# Translators: Logged when download is skipped because the file exists.
-		_("[Thread-{threadId}] File already exists:	 {localPath}")
-		return True, f"File already exists: {localPath}"
-
+		# 先尝试获取远程文件大小来验证本地文件是否完整
+		try:
+			req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+			req.get_method = lambda: 'HEAD'  # 只获取头部信息
+			with urllib.request.urlopen(req, timeout=10) as resp:
+				remoteSize = int(resp.headers.get("Content-Length", "0"))
+				localSize = os.path.getsize(localPath)
+				
+				if remoteSize > 0 and localSize == remoteSize:
+					if progressCallback:
+						progressCallback(fileName, localSize, localSize, 100.0)
+					print(f"[Thread-{threadId}] File already complete: {localPath}")
+					return True, f"File already complete: {localPath}"
+				elif remoteSize > 0 and localSize > remoteSize:
+					# 本地文件比远程文件大，可能损坏，删除重新下载
+					os.remove(localPath)
+		except:
+			# 如果无法获取远程大小，保持现有行为
+			if progressCallback:
+				size = os.path.getsize(localPath)
+				progressCallback(fileName, size, size, 100.0)
+			print(f"[Thread-{threadId}] File already exists: {localPath}")
+			return True, f"File already exists: {localPath}"
+	
 	for attempt in range(maxRetries):
 		try:
-			# Translators: Logged at the start of each download attempt.
-			print(
-				_(f"[Thread-{threadId}] Downloading (attempt {attempt + 1}/{maxRetries}): {url}")
-			)
-
-			req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+			print(f"[Thread-{threadId}] Downloading (attempt {attempt + 1}/{maxRetries}): {url}")
+			
+			# 检查是否存在部分下载的文件
+			resumePos = 0
+			if os.path.exists(localPath):
+				resumePos = os.path.getsize(localPath)
+				print(f"[Thread-{threadId}] Resuming from byte {resumePos}")
+			
+			# 构建请求头，支持断点续传
+			headers = {"User-Agent": "Mozilla/5.0"}
+			if resumePos > 0:
+				headers["Range"] = f"bytes={resumePos}-"
+			
+			req = urllib.request.Request(url, headers=headers)
+			
 			with urllib.request.urlopen(req, timeout=30) as resp:
-				total = int(resp.headers.get("Content-Length", "0"))
+				# 检查服务器是否支持断点续传
+				if resumePos > 0 and resp.status != 206:
+					print(f"[Thread-{threadId}] Server doesn't support resume, starting from beginning")
+					resumePos = 0
+					if os.path.exists(localPath):
+						os.remove(localPath)
+				
+				# 获取文件总大小
+				if resp.status == 206:
+					# 断点续传响应，从 Content-Range 头获取总大小
+					contentRange = resp.headers.get("Content-Range", "")
+					if contentRange:
+						total = int(contentRange.split("/")[-1])
+					else:
+						total = int(resp.headers.get("Content-Length", "0")) + resumePos
+				else:
+					total = int(resp.headers.get("Content-Length", "0"))
+				
 				if total:
-					# Translators: Logged once file size is known.
-					print(
-						_("[Thread-{id}] File size: {size:,} bytes").format(
-							id=threadId, size=total
-						)
-					)
-
-				downloaded = 0
-				lastReported = 0
-
-				with open(localPath, "wb") as fh:
+					print(f"[Thread-{threadId}] Total file size: {total:,} bytes")
+				
+				downloaded = resumePos
+				lastReported = downloaded
+				
+				# 选择文件打开模式
+				mode = "ab" if resumePos > 0 else "wb"
+				
+				with open(localPath, mode) as fh:
 					while True:
 						chunk = resp.read(CHUNK_SIZE)
 						if not chunk:
 							break
 						fh.write(chunk)
 						downloaded += len(chunk)
-
+						
 						if progressCallback and total:
 							percent = downloaded / total * 100
 							if (
-								downloaded - lastReported >= 1_048_576	# 1 MiB
+								downloaded - lastReported >= 1_048_576  # 1 MiB
 								or abs(percent - lastReported / total * 100) >= 1.0
 								or downloaded == total
 							):
-								progressCallback(
-									fileName, downloaded, total, percent
-								)
+								progressCallback(fileName, downloaded, total, percent)
 								lastReported = downloaded
-
-				if progressCallback and total:
-					progressCallback(fileName, downloaded, total, 100.0)
-
-			# Verify
-			if os.path.getsize(localPath) > 0:
-				# Translators: Logged when a file finishes downloading.
-				print(
-					_("[Thread-{id}] Successfully downloaded: ").format(id=threadId)
-					+ localPath
-				)
+				
+				# 验证下载完整性
+				actualSize = os.path.getsize(localPath)
+				
+				# 检查文件是否为空
+				if actualSize == 0:
+					raise RuntimeError("Downloaded file is empty")
+				
+				# 如果知道总大小，验证是否完整
+				if total > 0 and actualSize != total:
+					# 文件不完整，但不删除，下次重试时可以继续
+					raise RuntimeError(f"File incomplete: {actualSize}/{total} bytes downloaded")
+				
+				# 最终进度回调
+				if progressCallback:
+					progressCallback(fileName, actualSize, max(total, actualSize), 100.0)
+				
+				print(f"[Thread-{threadId}] Successfully downloaded: {localPath}")
 				return True, "Download completed"
-			raise RuntimeError("Downloaded file is empty")
-
+				
 		except urllib.error.HTTPError as err:
+			if err.code == 416:  # Range Not Satisfiable
+				# 可能是文件已经完整，检查一下
+				if os.path.exists(localPath):
+					actualSize = os.path.getsize(localPath)
+					if actualSize > 0:
+						print(f"[Thread-{threadId}] File appears to be complete: {localPath}")
+						if progressCallback:
+							progressCallback(fileName, actualSize, actualSize, 100.0)
+						return True, "Download completed"
 			msg = f"HTTP {err.code}: {err.reason}"
 		except urllib.error.URLError as err:
 			msg = f"URL Error: {err.reason}"
-		except Exception as err:  # noqa: BLE001
+		except Exception as err:
 			msg = f"Unexpected error: {err}"
-		# Failure handling / retry
+		
+		# 失败处理，但不删除部分下载的文件
 		print(f"[Thread-{threadId}] {msg} – {url}")
 		if attempt < maxRetries - 1:
 			wait = BACKOFF_BASE**attempt
@@ -199,8 +253,8 @@ def downloadSingleFile(
 			time.sleep(wait)
 		else:
 			return False, msg
+	
 	return False, "Unreachable"
-
 
 def downloadModelsMultithreaded(
 	modelsDir: str,
