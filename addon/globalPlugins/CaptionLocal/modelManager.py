@@ -7,6 +7,8 @@
 import wx
 import os
 import threading
+import json
+import urllib.request
 from typing import List, Tuple, Optional
 import winsound
 
@@ -19,6 +21,8 @@ try:
 except:
 	pass
 
+MODELS_CONFIG_URL = "https://raw.githubusercontent.com/tianzeshi-study/CaptionLocal/master/addon/globalPlugins/CaptionLocal/models.json"
+MODELS_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "models.json")
 
 class AdvancedSettingsDialog(wx.Dialog):
 	"""Advanced Settings Dialog for model download configuration."""
@@ -148,7 +152,10 @@ class ModelManagerFrame(wx.Frame):
 	"""Model Manager Main Frame."""
 	
 	def __init__(self):
-		super().__init__(None, title=_("Model Manager"), size=(600, 450))
+		super().__init__(None, title=_("Model Manager"), size=(600, 520))
+		
+		self.modelsConfig = []
+		self._loadLocalConfig()
 		
 		self.modelName = "Xenova/vit-gpt2-image-captioning"
 		self.filesToDownload = [
@@ -160,6 +167,9 @@ class ModelManagerFrame(wx.Frame):
 		]
 		self.resolvePath = "/resolve/main"
 		self.useMirror = False
+		
+		if self.modelsConfig:
+			self._applyModelConfig(self.modelsConfig[0])
 		
 		self.downloader = None
 		self.downloadThread = None
@@ -179,6 +189,21 @@ class ModelManagerFrame(wx.Frame):
 		titleFont = titleFont.Bold()
 		titleText.SetFont(titleFont)
 		mainSizer.Add(titleText, 0, wx.ALL | wx.CENTER, 15)
+		
+		modelBox = wx.StaticBoxSizer(wx.StaticBox(panel, label=_("Model Selection")), wx.VERTICAL)
+		modelSizer = wx.BoxSizer(wx.HORIZONTAL)
+		modelSizer.Add(wx.StaticText(panel, label=_("Select Model:")), 0, wx.ALL | wx.CENTER, 5)
+		
+		choices = [m.get("name", m.get("id", "Unknown")) for m in self.modelsConfig]
+		self.modelCombo = wx.ComboBox(panel, choices=choices, style=wx.CB_READONLY)
+		if choices:
+			self.modelCombo.SetSelection(0)
+		modelSizer.Add(self.modelCombo, 1, wx.ALL | wx.EXPAND, 5)
+		
+		self.updateConfigBtn = wx.Button(panel, label=_("Update Models List"))
+		modelSizer.Add(self.updateConfigBtn, 0, wx.ALL, 5)
+		modelBox.Add(modelSizer, 0, wx.ALL | wx.EXPAND, 5)
+		mainSizer.Add(modelBox, 0, wx.ALL | wx.EXPAND, 10)
 		
 		pathBox = wx.StaticBoxSizer(wx.StaticBox(panel, label=_("Download Settings")), wx.VERTICAL)
 		pathSizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -223,10 +248,26 @@ class ModelManagerFrame(wx.Frame):
 		except:
 			pass
 			
+	def _loadLocalConfig(self):
+		try:
+			if os.path.exists(MODELS_CONFIG_FILE):
+				with open(MODELS_CONFIG_FILE, "r", encoding="utf-8") as f:
+					data = json.load(f)
+					self.modelsConfig = data.get("models", [])
+		except Exception as e:
+			print(f"Error loading local models config: {e}")
+
+	def _applyModelConfig(self, modelData):
+		self.modelName = modelData.get("id", "Unknown")
+		self.filesToDownload = modelData.get("files", [])
+		self.resolvePath = modelData.get("resolvePath", "/resolve/main")
+
 	def _bindEvents(self):
 		self.browseBtn.Bind(wx.EVT_BUTTON, self.onBrowsePath)
 		self.advancedBtn.Bind(wx.EVT_BUTTON, self.onAdvancedSettings)
 		self.downloadBtn.Bind(wx.EVT_BUTTON, self.onDownload)
+		self.modelCombo.Bind(wx.EVT_COMBOBOX, self.onModelSelect)
+		self.updateConfigBtn.Bind(wx.EVT_BUTTON, self.onUpdateConfig)
 		self.Bind(wx.EVT_CLOSE, self.onClose)
 		
 	def log(self, message: str):
@@ -265,6 +306,51 @@ class ModelManagerFrame(wx.Frame):
 			self.filesInfoText.SetLabel(_("File Count: {count}").format(count=len(self.filesToDownload)))
 		dlg.Destroy()
 		
+	def onModelSelect(self, event):
+		sel = self.modelCombo.GetSelection()
+		if sel != wx.NOT_FOUND and sel < len(self.modelsConfig):
+			self._applyModelConfig(self.modelsConfig[sel])
+			self.modelInfoText.SetLabel(_("Model: {modelName}").format(modelName=self.modelName))
+			self.filesInfoText.SetLabel(_("File Count: {count}").format(count=len(self.filesToDownload)))
+
+	def onUpdateConfig(self, event):
+		self.updateConfigBtn.Disable()
+		self.statusText.SetLabel(_("Updating models list..."))
+		threading.Thread(target=self._updateConfigWorker, daemon=True).start()
+		
+	def _updateConfigWorker(self):
+		try:
+			req = urllib.request.Request(MODELS_CONFIG_URL, headers={'User-Agent': 'Mozilla/5.0'})
+			with urllib.request.urlopen(req, timeout=10) as response:
+				data = json.loads(response.read().decode('utf-8'))
+				if "models" in data:
+					with open(MODELS_CONFIG_FILE, "w", encoding="utf-8") as f:
+						json.dump(data, f, indent='\t', ensure_ascii=False)
+					wx.CallAfter(self._updateConfigSuccess, data["models"])
+				else:
+					wx.CallAfter(self._updateConfigFail, _("Invalid configuration format."))
+		except Exception as e:
+			wx.CallAfter(self._updateConfigFail, str(e))
+			
+	def _updateConfigSuccess(self, models):
+		self.modelsConfig = models
+		choices = [m.get("name", m.get("id", "Unknown")) for m in self.modelsConfig]
+		self.modelCombo.Clear()
+		self.modelCombo.AppendItems(choices)
+		if choices:
+			self.modelCombo.SetSelection(0)
+			self._applyModelConfig(self.modelsConfig[0])
+			self.modelInfoText.SetLabel(_("Model: {modelName}").format(modelName=self.modelName))
+			self.filesInfoText.SetLabel(_("File Count: {count}").format(count=len(self.filesToDownload)))
+		self.statusText.SetLabel(_("Models list updated successfully."))
+		self.updateConfigBtn.Enable()
+		SoundNotification.playSuccess()
+
+	def _updateConfigFail(self, error):
+		self.statusText.SetLabel(_("Failed to update models list: {error}").format(error=error))
+		self.updateConfigBtn.Enable()
+		SoundNotification.playError()
+
 	def onDownload(self, event):
 		if self.downloadThread and self.downloadThread.is_alive():
 			if self.downloader:

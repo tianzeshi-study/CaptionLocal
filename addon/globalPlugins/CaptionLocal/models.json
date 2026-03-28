@@ -1,0 +1,27 @@
+{
+	"version": "1.0",
+	"models": [
+		{
+			"id": "Xenova/vit-gpt2-image-captioning",
+			"name": "Vit-GPT2 Image Captioning (Xenova)",
+			"resolvePath": "/resolve/main",
+			"files": [
+				"onnx/encoder_model_quantized.onnx",
+				"onnx/decoder_model_merged_quantized.onnx", 
+				"config.json",
+				"vocab.json",
+				"preprocessor_config.json"
+			]
+		},
+		{
+			"id": "Mozilla/distilvit",
+			"name": "DistilViT (Mozilla)",
+			"resolvePath": "/resolve/main",
+			"files": [
+				"onnx/model_quantized.onnx",
+				"config.json",
+				"preprocessor_config.json"
+			]
+		}
+	]
+}
