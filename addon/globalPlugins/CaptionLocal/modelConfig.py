@@ -5,7 +5,9 @@
 # For full terms and any additional permissions, see the NVDA license file: https://github.com/nvaccess/nvda/blob/master/copying.txt
 
 from dataclasses import dataclass, fields, replace
-from typing import Type
+from typing import Type, TypeVar
+
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -205,7 +207,7 @@ def initialize():
 	_DEFAULT_PREPROCESSOR_CONFIG = _PreprocessorConfig()
 
 
-def _createConfigFromDict[T](
+def _createConfigFromDict(
 	configClass: Type[T],
 	configdict: dict[str, str | int | float | bool | list | dict | None],
 	defaultConfig: T,
