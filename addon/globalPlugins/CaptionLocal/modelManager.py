@@ -205,9 +205,9 @@ class ModelManagerFrame(wx.Frame):
 		modelBox.Add(modelSizer, 0, wx.ALL | wx.EXPAND, 5)
 		mainSizer.Add(modelBox, 0, wx.ALL | wx.EXPAND, 10)
 		
-		pathBox = wx.StaticBoxSizer(wx.StaticBox(panel, label=_("Download Settings")), wx.VERTICAL)
+		pathBox = wx.StaticBoxSizer(wx.StaticBox(panel, label=_("Model Directory Settings")), wx.VERTICAL)
 		pathSizer = wx.BoxSizer(wx.HORIZONTAL)
-		pathSizer.Add(wx.StaticText(panel, label=_("Download Path:")), 0, wx.ALL | wx.CENTER, 5)
+		pathSizer.Add(wx.StaticText(panel, label=_("Models Directory:")), 0, wx.ALL | wx.CENTER, 5)
 		self.pathCtrl = wx.TextCtrl(panel, size=(350, -1))
 		pathSizer.Add(self.pathCtrl, 1, wx.ALL | wx.EXPAND, 5)
 		self.browseBtn = wx.Button(panel, label=_("Browse..."))
@@ -224,7 +224,9 @@ class ModelManagerFrame(wx.Frame):
 		
 		btnSizer = wx.BoxSizer(wx.HORIZONTAL)
 		self.advancedBtn = wx.Button(panel, label=_("Advanced Settings..."))
+		self.setActiveBtn = wx.Button(panel, label=_("Set as Active Model"))
 		btnSizer.Add(self.advancedBtn, 0, wx.ALL, 5)
+		btnSizer.Add(self.setActiveBtn, 0, wx.ALL, 5)
 		btnSizer.AddStretchSpacer(1)
 		self.downloadBtn = wx.Button(panel, label=_("Start Download"), size=(120, 35))
 		btnSizer.Add(self.downloadBtn, 0, wx.ALL, 5)
@@ -243,7 +245,7 @@ class ModelManagerFrame(wx.Frame):
 	def _initDefaultPath(self):
 		import config
 		try:
-			defaultPath = config.conf["captionLocal"]["localModelPath"]
+			defaultPath = config.conf["captionLocal"]["modelsDir"]
 			self.pathCtrl.SetValue(defaultPath)
 		except:
 			pass
@@ -265,6 +267,7 @@ class ModelManagerFrame(wx.Frame):
 	def _bindEvents(self):
 		self.browseBtn.Bind(wx.EVT_BUTTON, self.onBrowsePath)
 		self.advancedBtn.Bind(wx.EVT_BUTTON, self.onAdvancedSettings)
+		self.setActiveBtn.Bind(wx.EVT_BUTTON, self.onSetActive)
 		self.downloadBtn.Bind(wx.EVT_BUTTON, self.onDownload)
 		self.modelCombo.Bind(wx.EVT_COMBOBOX, self.onModelSelect)
 		self.updateConfigBtn.Bind(wx.EVT_BUTTON, self.onUpdateConfig)
@@ -318,6 +321,19 @@ class ModelManagerFrame(wx.Frame):
 		self.statusText.SetLabel(_("Updating models list..."))
 		threading.Thread(target=self._updateConfigWorker, daemon=True).start()
 		
+	def onSetActive(self, event):
+		import config
+		from logHandler import log
+		try:
+			config.conf["captionLocal"]["modelsDir"] = self.pathCtrl.GetValue()
+			config.conf["captionLocal"]["currentModel"] = self.modelName
+			self.log(_("✅ Active model set to: {modelName}").format(modelName=self.modelName))
+			SoundNotification.playSuccess()
+		except Exception as e:
+			log.error(f"Failed to set active model: {e}")
+			self.log(_("❌ Failed to set active model."))
+			SoundNotification.playError()
+
 	def _updateConfigWorker(self):
 		try:
 			req = urllib.request.Request(MODELS_CONFIG_URL, headers={'User-Agent': 'Mozilla/5.0'})
@@ -389,7 +405,8 @@ class ModelManagerFrame(wx.Frame):
 				SoundNotification.playSuccess()
 				# Update config with the new path if it was changed
 				import config
-				config.conf["captionLocal"]["localModelPath"] = os.path.join(downloadPath, self.modelName)
+				config.conf["captionLocal"]["modelsDir"] = downloadPath
+				config.conf["captionLocal"]["currentModel"] = self.modelName
 			else:
 				self.log(_("❌ Download failed for some files."))
 				self.updateStatus(_("Failed"))

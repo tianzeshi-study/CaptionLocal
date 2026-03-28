@@ -54,7 +54,7 @@ class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
 		sHelper = guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
 		
 		# Translators: This is a label for an edit field in the CaptionLocal Settings panel.
-		modelPathLabel = _("model path")
+		modelPathLabel = _("models directory")
 
 		groupSizer = wx.StaticBoxSizer(wx.VERTICAL, self, label=modelPathLabel)
 		groupBox = groupSizer.GetStaticBox()
@@ -68,7 +68,7 @@ class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
 		directoryPathHelper = gui.guiHelper.PathSelectionHelper(groupBox, browseText, dirDialogTitle)
 		directoryEntryControl = groupHelper.addItem(directoryPathHelper)
 		self.modelPathEdit = directoryEntryControl.pathControl
-		self.modelPathEdit.Value = config.conf['captionLocal']['localModelPath']
+		self.modelPathEdit.Value = config.conf['captionLocal']['modelsDir']
 		
 		# Translators: A setting in addon settings dialog.
 		self.loadModelWhenInit = sHelper.addItem(wx.CheckBox(self, label=_("load model when init (may cause high use of memory)")))
@@ -99,7 +99,7 @@ class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
 		"""
 		# Make sure we're operating in the "normal" profile
 		if config.conf.profiles[-1].name is None and len(config.conf.profiles) == 1:
-			config.conf['captionLocal']['localModelPath'] = self.modelPathEdit.GetValue()
+			config.conf['captionLocal']['modelsDir'] = self.modelPathEdit.GetValue()
 			config.conf['captionLocal']['loadModelWhenInit'] = self.loadModelWhenInit.GetValue()
 		else:
 			log.debugWarning('No configuration saved for CaptionLocal since the current profile is not the default one.')

@@ -149,7 +149,9 @@ class ImageDescriber:
 		"""
 
 		if not localModelDirPath:
-			localModelDirPath = config.conf["captionLocal"]["localModelPath"]
+			modelsDir = config.conf["captionLocal"]["modelsDir"]
+			currentModel = config.conf["captionLocal"]["currentModel"]
+			localModelDirPath = os.path.join(modelsDir, currentModel)
 		
 		encoderPath = os.path.join(localModelDirPath, "onnx", "encoder_model_quantized.onnx")
 		decoderPath = os.path.join(localModelDirPath, "onnx", "decoder_model_merged_quantized.onnx")

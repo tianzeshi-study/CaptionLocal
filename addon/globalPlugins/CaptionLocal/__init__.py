@@ -43,7 +43,8 @@ _here = os.path.dirname(__file__)
 _modelsDir = os.path.abspath(os.path.join(_here, "..", "..", "models"))
 
 CONFSPEC = {
-	"localModelPath": f"string(default={_modelsDir}/Xenova/vit-gpt2-image-captioning)",
+	"modelsDir": f"string(default={_modelsDir})",
+	"currentModel": "string(default=Xenova/vit-gpt2-image-captioning)",
 	"loadModelWhenInit": "boolean(default=true)"
 }
 
