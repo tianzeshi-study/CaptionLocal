@@ -1,387 +1,510 @@
 # -*- coding: UTF-8 -*-
+# A part of NonVisual Desktop Access (NVDA)
+# Copyright (C) 2025 NV Access Limited, Tianze
+# This file may be used under the terms of the GNU General Public License, version 2 or later, as modified by the NVDA license.
+# For full terms and any additional permissions, see the NVDA license file: https://github.com/nvaccess/nvda/blob/master/copying.txt
+
 """
 Multi‑threaded model downloader
-==============================
-
-Download ONNX / tokenizer assets from *Hugging Face* (or any HTTP host)
-with progress callbacks.
-
-Run this file directly for a CLI demonstration.
-
-Example
--------
-.. code:: bash
-
-	python download_models.py  # will download to ``models`` sibling dir
 """
-
-from __future__ import annotations
 
 import os
 import threading
 import time
-import urllib.error
-import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List, Tuple, Optional, Set
 
-try:
-	import addonHandler
-	addonHandler.initTranslation()
-except:
-	_ = format
-	pass
+import requests
+from requests.adapters import HTTPAdapter
+from requests.exceptions import RequestException
+from requests.models import Response
+from urllib3.util.retry import Retry
 
+from logHandler import log
+import config
 
-_: Callable[[str], str]	 # translation alias injected by NVDA
-
-# --------------------------------------------------------------------------- #
-# Type Aliases & Constants
-# --------------------------------------------------------------------------- #
-
-# (fileName, downloadedBytes, totalBytes, progressPercent)
+# Type definitions
 ProgressCallback = Callable[[str, int, int, float], None]
 
+# Constants
 CHUNK_SIZE: int = 8_192
 MAX_RETRIES: int = 3
-BACKOFF_BASE: int = 2
+BACKOFF_BASE: int = 2  # Base delay (in seconds) for exponential backoff strategy
 
 
-# --------------------------------------------------------------------------- #
-# Helpers
-# --------------------------------------------------------------------------- #
+class ModelDownloader:
+	"""Multi-threaded model downloader with progress tracking and retry logic."""
 
+	def __init__(
+		self,
+		remoteHost: str = "huggingface.co",
+		maxWorkers: int = 4,
+		maxRetries: int = MAX_RETRIES,
+	):
+		"""
+		Initialize the ModelDownloader.
+		"""
+		self.remoteHost = remoteHost
+		self.maxWorkers = maxWorkers
+		self.maxRetries = maxRetries
 
-def ensureModelsDirectory(basePath: str | None = None) -> str:
-	"""
-	Ensure the *models* directory exists (``../../models`` relative to *basePath*).
+		# Thread control
+		self.cancelRequested = False
+		self.downloadLock = threading.Lock()
+		self.activeFutures: Set = set()
 
-	:param basePath: Base folder; defaults to the directory containing *this* file.
-	:return: Absolute path of the *models* directory.
-	:raises OSError: When the directory cannot be created.
-	"""
-	here = basePath or os.path.dirname(__file__)
-	modelsDir = os.path.abspath(os.path.join(here, "..", "..", "models"))
+		# Configure requests session with retry strategy and automatic redirects
+		self.session = requests.Session()
 
-	try:
-		Path(modelsDir).mkdir(parents=True, exist_ok=True)
-		# Translators: Logged when the local models directory is created / found.
-		_(f"Models directory ensured:{modelsDir} ")
-		return modelsDir
-	except OSError as err:
-		raise OSError(f"Failed to create models directory {modelsDir}: {err}") from err
+		# Configure retry strategy
+		retryStrategy = Retry(
+			total=maxRetries,
+			backoff_factor=BACKOFF_BASE,
+			status_forcelist=[429, 500, 502, 503, 504],
+			allowed_methods=["HEAD", "GET", "OPTIONS"],
+		)
 
+		adapter = HTTPAdapter(max_retries=retryStrategy)
+		self.session.mount("https://", adapter)
 
-def constructDownloadUrl(
-	remoteHost: str,
-	modelName: str,
-	filePath: str,
-	resolvePath: str = "/resolve/main",
-) -> str:
-	"""
-	Construct a full download URL for *Hugging Face‑style* repositories.
+	def requestCancel(self) -> None:
+		"""Request cancellation of all active downloads."""
+		log.debug("Cancellation requested")
+		self.cancelRequested = True
 
-	:param remoteHost: ``huggingface.co`` or other HTTP(S) host.
-	:param modelName: Model repository name, e.g. ``Xenova/vit-gpt2-image-captioning``.
-	:param filePath: Path inside the repo.
-	:param resolvePath: The branch / ref path, default ``/resolve/main``.
-	"""
-	if not remoteHost.startswith(("http://", "https://")):
-		remoteHost = f"https://{remoteHost}"
+		# Cancel all active futures
+		with self.downloadLock:
+			for future in self.activeFutures:
+				if not future.done():
+					future.cancel()
+			self.activeFutures.clear()
 
-	base = remoteHost.rstrip("/")
-	model = modelName.strip("/")
-	ref = resolvePath.strip("/")
-	filePath = filePath.lstrip("/")
+	def resetCancellation(self) -> None:
+		"""Reset cancellation state for new download session."""
+		with self.downloadLock:
+			self.cancelRequested = False
+			self.activeFutures.clear()
 
-	return f"{base}/{model}/{ref}/{filePath}"
+	def ensureModelsDirectory(self, defaultPath: str) -> str:
+		"""
+		Ensure the *models* directory exists.
+		"""
+		modelsDir = os.path.abspath(defaultPath)
 
-
-def downloadSingleFile(
-	url: str,
-	localPath: str,
-	maxRetries: int = MAX_RETRIES,
-	progressCallback: ProgressCallback | None = None,
-) -> tuple[bool, str]:
-	"""
-	Download a single file with basic exponential back‑off retry strategy and resume support.
-	:param url: Remote URL.
-	:param localPath: Destination path.
-	:param maxRetries: Attempt count before failing.
-	:param progressCallback: Optional progress reporter.
-	:return: ``(success, message)``
-	"""
-	threadId = threading.current_thread().ident or 0
-	fileName = os.path.basename(localPath)
-	
-	# Create destination directory
-	try:
-		Path(os.path.dirname(localPath)).mkdir(parents=True, exist_ok=True)
-	except OSError as err:
-		return False, f"Failed to create directory {localPath}: {err}"
-	
-	# Check if file already exists and is complete
-	if os.path.exists(localPath):
-		# 先尝试获取远程文件大小来验证本地文件是否完整
 		try:
-			req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-			req.get_method = lambda: 'HEAD'  # 只获取头部信息
-			with urllib.request.urlopen(req, timeout=10) as resp:
-				remoteSize = int(resp.headers.get("Content-Length", "0"))
-				localSize = os.path.getsize(localPath)
-				
-				if remoteSize > 0 and localSize == remoteSize:
-					if progressCallback:
-						progressCallback(fileName, localSize, localSize, 100.0)
-					print(f"[Thread-{threadId}] File already complete: {localPath}")
-					return True, f"File already complete: {localPath}"
-				elif remoteSize > 0 and localSize > remoteSize:
-					# 本地文件比远程文件大，可能损坏，删除重新下载
+			Path(modelsDir).mkdir(parents=True, exist_ok=True)
+		except OSError as err:
+			raise OSError(f"Failed to create models directory {modelsDir}: {err}") from err
+		else:
+			log.debug(f"Models directory ensured: {modelsDir}")
+			return modelsDir
+
+	def constructDownloadUrl(
+		self,
+		modelName: str,
+		filePath: str,
+		resolvePath: str = "/resolve/main",
+	) -> str:
+		"""
+		Construct a full download URL for *Hugging Face‑style* repositories.
+		"""
+		remoteHost = self.remoteHost
+		if not remoteHost.startswith(("http://", "https://")):
+			remoteHost = f"https://{remoteHost}"
+
+		base = remoteHost.rstrip("/")
+		model = modelName.strip("/")
+		ref = resolvePath.strip("/")
+		filePath = filePath.lstrip("/")
+
+		return f"{base}/{model}/{ref}/{filePath}"
+
+	def _getRemoteFileSize(self, url: str) -> int:
+		"""
+		Get remote file size using HEAD request.
+		"""
+		if self.cancelRequested:
+			return 0
+
+		try:
+			response = self.session.head(url, timeout=10, allow_redirects=True)
+			response.raise_for_status()
+		except Exception as e:
+			if not self.cancelRequested:
+				log.warning(f"Failed to get remote file size (HEAD) for {url}: {e}")
+		else:
+			contentLength = response.headers.get("Content-Length")
+			if contentLength:
+				return int(contentLength)
+
+		try:
+			response = self.session.get(url, headers={"Range": "bytes=0-0"}, timeout=10, allow_redirects=True)
+		except Exception as e:
+			if not self.cancelRequested:
+				log.warning(f"Failed to get remote file size (GET) for {url}: {e}")
+		else:
+			if response.status_code == 206:  # Partial content
+				contentRange = response.headers.get("Content-Range", "")
+				if contentRange and "/" in contentRange:
+					return int(contentRange.split("/")[-1])
+
+		return 0
+
+	def _reportProgress(
+		self,
+		callback: ProgressCallback | None,
+		fileName: str,
+		downloaded: int,
+		total: int,
+		lastReported: int,
+	) -> int:
+		"""
+		Report download progress.
+		"""
+		if not callback or total == 0 or self.cancelRequested:
+			return lastReported
+
+		percent = downloaded / total * 100
+
+		if (
+			downloaded - lastReported >= 1_048_576  # 1 MiB
+			or abs(percent - lastReported / total * 100) >= 1.0
+			or downloaded == total
+		):
+			callback(fileName, downloaded, total, percent)
+			return downloaded
+
+		return lastReported
+
+	def downloadSingleFile(
+		self,
+		url: str,
+		localPath: str,
+		progressCallback: ProgressCallback | None = None,
+	) -> Tuple[bool, str]:
+		"""
+		Download a single file with resume support.
+		"""
+		if self.cancelRequested:
+			return False, "Download cancelled"
+
+		threadId = threading.current_thread().ident or 0
+		fileName = os.path.basename(localPath)
+
+		# Create destination directory
+		success, message = self._createDestinationDirectory(localPath)
+		if not success:
+			return False, message
+
+		# Get remote file size
+		remoteSize = self._getRemoteFileSize(url)
+
+		if self.cancelRequested:
+			return False, "Download cancelled"
+
+		# Check if file already exists and is complete
+		success, message = self._checkExistingFile(
+			localPath,
+			remoteSize,
+			fileName,
+			progressCallback,
+			threadId,
+		)
+		if success is not None:
+			return success, message
+
+		# Attempt download with retries
+		return self._downloadWithRetries(url, localPath, fileName, threadId, progressCallback)
+
+	def _createDestinationDirectory(self, localPath: str) -> Tuple[bool, str]:
+		"""Create destination directory if it doesn't exist."""
+		try:
+			Path(os.path.dirname(localPath)).mkdir(parents=True, exist_ok=True)
+			return True, ""
+		except OSError as err:
+			return False, f"Failed to create directory {localPath}: {err}"
+
+	def _checkExistingFile(
+		self,
+		localPath: str,
+		remoteSize: int,
+		fileName: str,
+		progressCallback: ProgressCallback | None,
+		threadId: int,
+	) -> Tuple[Optional[bool], str]:
+		"""Check if file already exists and is complete."""
+		if not os.path.exists(localPath):
+			return None, ""
+
+		localSize = os.path.getsize(localPath)
+
+		if remoteSize > 0:
+			if localSize == remoteSize:
+				if progressCallback and not self.cancelRequested:
+					progressCallback(fileName, localSize, localSize, 100.0)
+				return True, f"File already complete: {localPath}"
+			elif localSize > remoteSize:
+				try:
 					os.remove(localPath)
-		except:
-			# 如果无法获取远程大小，保持现有行为
-			if progressCallback:
-				size = os.path.getsize(localPath)
-				progressCallback(fileName, size, size, 100.0)
-			print(f"[Thread-{threadId}] File already exists: {localPath}")
-			return True, f"File already exists: {localPath}"
-	
-	for attempt in range(maxRetries):
-		try:
-			print(f"[Thread-{threadId}] Downloading (attempt {attempt + 1}/{maxRetries}): {url}")
-			
-			# 检查是否存在部分下载的文件
-			resumePos = 0
-			if os.path.exists(localPath):
-				resumePos = os.path.getsize(localPath)
-				print(f"[Thread-{threadId}] Resuming from byte {resumePos}")
-			
-			# 构建请求头，支持断点续传
-			headers = {"User-Agent": "Mozilla/5.0"}
-			if resumePos > 0:
-				headers["Range"] = f"bytes={resumePos}-"
-			
-			req = urllib.request.Request(url, headers=headers)
-			
-			with urllib.request.urlopen(req, timeout=30) as resp:
-				# 检查服务器是否支持断点续传
-				if resumePos > 0 and resp.status != 206:
-					print(f"[Thread-{threadId}] Server doesn't support resume, starting from beginning")
-					resumePos = 0
-					if os.path.exists(localPath):
-						os.remove(localPath)
-				
-				# 获取文件总大小
-				if resp.status == 206:
-					# 断点续传响应，从 Content-Range 头获取总大小
-					contentRange = resp.headers.get("Content-Range", "")
-					if contentRange:
-						total = int(contentRange.split("/")[-1])
-					else:
-						total = int(resp.headers.get("Content-Length", "0")) + resumePos
+				except OSError:
+					pass
+		else:
+			if localSize > 0:
+				if progressCallback and not self.cancelRequested:
+					progressCallback(fileName, localSize, localSize, 100.0)
+				return True, f"File already exists: {localPath}"
+
+		return None, ""
+
+	def _downloadWithRetries(
+		self,
+		url: str,
+		localPath: str,
+		fileName: str,
+		threadId: int,
+		progressCallback: ProgressCallback | None,
+	) -> Tuple[bool, str]:
+		"""Attempt download with retry logic."""
+		for attempt in range(self.maxRetries):
+			if self.cancelRequested:
+				return False, "Download cancelled"
+
+			try:
+				success, message = self._performSingleDownload(
+					url,
+					localPath,
+					fileName,
+					threadId,
+					progressCallback,
+				)
+
+			except requests.exceptions.HTTPError as e:
+				message = self._handleHttpError(e, localPath, fileName, progressCallback, threadId)
+				if message.startswith("Download completed"):
+					return True, message
+
+			except RequestException as e:
+				if self.cancelRequested:
+					return False, "Download cancelled"
+				message = f"Request error: {str(e)}"
+
+			except Exception as e:
+				if self.cancelRequested:
+					return False, "Download cancelled"
+				message = f"Unexpected error: {str(e)}"
+				log.error(message)
+
+			else:
+				if success:
+					return True, message
+
+			if not self.cancelRequested:
+				if attempt < self.maxRetries - 1:
+					success = self._waitForRetry(attempt, threadId)
+					if not success:
+						return False, "Download cancelled"
 				else:
-					total = int(resp.headers.get("Content-Length", "0"))
-				
-				if total:
-					print(f"[Thread-{threadId}] Total file size: {total:,} bytes")
-				
-				downloaded = resumePos
-				lastReported = downloaded
-				
-				# 选择文件打开模式
-				mode = "ab" if resumePos > 0 else "wb"
-				
-				with open(localPath, mode) as fh:
-					while True:
-						chunk = resp.read(CHUNK_SIZE)
-						if not chunk:
-							break
+					return False, message
+
+		return False, "Maximum retries exceeded"
+
+	def _performSingleDownload(
+		self,
+		url: str,
+		localPath: str,
+		fileName: str,
+		threadId: int,
+		progressCallback: ProgressCallback | None,
+	) -> Tuple[bool, str]:
+		"""Perform a single download attempt with resume support."""
+		resumePos = 0
+		if os.path.exists(localPath):
+			resumePos = os.path.getsize(localPath)
+
+		# Set up headers for resume
+		headers = {}
+		if resumePos > 0:
+			headers["Range"] = f"bytes={resumePos}-"
+
+		# Make request
+		response = self.session.get(
+			url,
+			headers=headers,
+			stream=True,
+			timeout=10,
+			allow_redirects=True,
+		)
+
+		# Check if resume is supported
+		if resumePos > 0 and response.status_code != 206:
+			if os.path.exists(localPath):
+				try:
+					os.remove(localPath)
+				except OSError:
+					pass
+
+			if self.cancelRequested:
+				response.close()
+				raise Exception("Download cancelled")
+
+			response.close()
+			response = self.session.get(url, stream=True, timeout=10, allow_redirects=True)
+
+		response.raise_for_status()
+
+		if self.cancelRequested:
+			response.close()
+			return False, "Download cancelled"
+
+		try:
+			# Determine total file size
+			if response.status_code == 206:
+				contentRange = response.headers.get("Content-Range", "")
+				if contentRange and "/" in contentRange:
+					total = int(contentRange.split("/")[-1])
+				else:
+					total = int(response.headers.get("Content-Length", "0")) + resumePos
+			else:
+				total = int(response.headers.get("Content-Length", "0"))
+
+			downloaded = resumePos
+			lastReported = downloaded
+			mode = "ab" if resumePos > 0 else "wb"
+
+			with open(localPath, mode) as fh:
+				for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+					if self.cancelRequested:
+						return False, "Download cancelled"
+
+					if chunk:
 						fh.write(chunk)
 						downloaded += len(chunk)
-						
-						if progressCallback and total:
-							percent = downloaded / total * 100
-							if (
-								downloaded - lastReported >= 1_048_576  # 1 MiB
-								or abs(percent - lastReported / total * 100) >= 1.0
-								or downloaded == total
-							):
-								progressCallback(fileName, downloaded, total, percent)
-								lastReported = downloaded
-				
-				# 验证下载完整性
+
+						if total > 0:
+							lastReported = self._reportProgress(
+								progressCallback,
+								fileName,
+								downloaded,
+								total,
+								lastReported,
+							)
+
+			# Verify
+			actualSize = os.path.getsize(localPath)
+			if actualSize == 0:
+				return False, "Downloaded file is empty"
+			if total > 0 and actualSize != total:
+				return False, f"File incomplete: {actualSize}/{total} bytes"
+
+			if progressCallback and not self.cancelRequested:
+				progressCallback(fileName, actualSize, max(total, actualSize), 100.0)
+
+			return True, "Download completed"
+
+		finally:
+			response.close()
+
+	def _handleHttpError(
+		self,
+		error: requests.exceptions.HTTPError,
+		localPath: str,
+		fileName: str,
+		progressCallback: ProgressCallback | None,
+		threadId: int,
+	) -> str:
+		"""Handle HTTP errors."""
+		if error.response is not None and error.response.status_code == 416:  # Range Not Satisfiable
+			if os.path.exists(localPath):
 				actualSize = os.path.getsize(localPath)
-				
-				# 检查文件是否为空
-				if actualSize == 0:
-					raise RuntimeError("Downloaded file is empty")
-				
-				# 如果知道总大小，验证是否完整
-				if total > 0 and actualSize != total:
-					# 文件不完整，但不删除，下次重试时可以继续
-					raise RuntimeError(f"File incomplete: {actualSize}/{total} bytes downloaded")
-				
-				# 最终进度回调
-				if progressCallback:
-					progressCallback(fileName, actualSize, max(total, actualSize), 100.0)
-				
-				print(f"[Thread-{threadId}] Successfully downloaded: {localPath}")
-				return True, "Download completed"
-				
-		except urllib.error.HTTPError as err:
-			if err.code == 416:  # Range Not Satisfiable
-				# 可能是文件已经完整，检查一下
-				if os.path.exists(localPath):
-					actualSize = os.path.getsize(localPath)
-					if actualSize > 0:
-						print(f"[Thread-{threadId}] File appears to be complete: {localPath}")
-						if progressCallback:
-							progressCallback(fileName, actualSize, actualSize, 100.0)
-						return True, "Download completed"
-			msg = f"HTTP {err.code}: {err.reason}"
-		except urllib.error.URLError as err:
-			msg = f"URL Error: {err.reason}"
-		except Exception as err:
-			msg = f"Unexpected error: {err}"
-		
-		# 失败处理，但不删除部分下载的文件
-		print(f"[Thread-{threadId}] {msg} – {url}")
-		if attempt < maxRetries - 1:
-			wait = BACKOFF_BASE**attempt
-			print(f"[Thread-{threadId}] Waiting {wait}s before retry…")
-			time.sleep(wait)
-		else:
-			return False, msg
-	
-	return False, "Unreachable"
+				if actualSize > 0:
+					if progressCallback and not self.cancelRequested:
+						progressCallback(fileName, actualSize, actualSize, 100.0)
+					return "Download completed"
+		return f"HTTP {error.response.status_code if error.response else 'Error'}: {str(error)}"
 
-def downloadModelsMultithreaded(
-	modelsDir: str,
-	remoteHost: str = "huggingface.co",
-	modelName: str = "Xenova/vit-gpt2-image-captioning",
-	filesToDownload: list[str] | None = None,
-	resolvePath: str = "/resolve/main",
-	maxWorkers: int = 4,
-	progressCallback: ProgressCallback | None = None,
-) -> tuple[list[str], list[str]]:
-	"""
-	Download multiple model assets concurrently.
+	def _waitForRetry(self, attempt: int, threadId: int) -> bool:
+		"""Wait for retry."""
+		wait = BACKOFF_BASE**attempt
+		for _ in range(wait):
+			if self.cancelRequested:
+				return False
+			time.sleep(1)
+		return True
 
-	:param modelsDir: Base *models* directory.
-	:param remoteHost: Hostname (default ``huggingface.co``).
-	:param modelName: Repository name.
-	:param filesToDownload: Explicit file list; *None* uses common defaults.
-	:param resolvePath: Branch / ref path.
-	:param maxWorkers: Thread pool size.
-	:param progressCallback: Optional reporter.
-	:return: ``(successfulPaths, failedPaths)``
-	"""
-	if not remoteHost or not modelName:
-		raise ValueError("remoteHost and modelName cannot be empty")
+	def downloadModelsMultithreaded(
+		self,
+		modelsDir: str,
+		modelName: str = "Xenova/vit-gpt2-image-captioning",
+		filesToDownload: Optional[List[str]] = None,
+		resolvePath: str = "/resolve/main",
+		progressCallback: Optional[ProgressCallback] = None,
+		maxWorkers: int = 4
+	) -> Tuple[List[str], List[str]]:
+		"""Download multiple model assets concurrently."""
+		if not self.remoteHost or not modelName:
+			raise ValueError("remoteHost and modelName cannot be empty")
 
-	filesToDownload = filesToDownload or [
-		"onnx/encoder_model_quantized.onnx",
-		"onnx/decoder_model_merged_quantized.onnx",
-		"config.json",
-		"vocab.json",
-	]
-	if not filesToDownload:
-		raise ValueError("filesToDownload cannot be empty")
+		filesToDownload = filesToDownload or [
+			"onnx/encoder_model_quantized.onnx",
+			"onnx/decoder_model_merged_quantized.onnx",
+			"config.json",
+			"vocab.json",
+			"preprocessor_config.json",
+		]
 
+		localModelDir = os.path.join(modelsDir, modelName)
+		successful: List[str] = []
+		failed: List[str] = []
 
-	print(_(f"Starting download of {len(filesToDownload)} files for model: {modelName}\nRemote host: {remoteHost}\nMax workers: {maxWorkers}"))
-	
+		with ThreadPoolExecutor(max_workers=maxWorkers) as executor:
+			futures = []
 
-	localModelDir = os.path.join(modelsDir, modelName)
-	successful: list[str] = []
-	failed: list[str] = []
+			for path in filesToDownload:
+				if self.cancelRequested:
+					break
 
-	with ThreadPoolExecutor(max_workers=maxWorkers) as executor:
-		taskMap = {
-			executor.submit(
-				downloadSingleFile,
-				constructDownloadUrl(remoteHost, modelName, path, resolvePath),
-				os.path.join(localModelDir, path),
-				MAX_RETRIES,
-				progressCallback,
-			): path
-			for path in filesToDownload
-		}
+				future = executor.submit(
+					self.downloadSingleFile,
+					self.constructDownloadUrl(modelName, path, resolvePath),
+					os.path.join(localModelDir, path),
+					progressCallback,
+				)
+				futures.append((future, path))
 
-		for future in as_completed(taskMap):
-			filePath = taskMap[future]
-			try:
-				ok, _msg = future.result()
-				if ok:
-					successful.append(filePath)
-					print("✓ " + filePath)
-				else:
+				with self.downloadLock:
+					self.activeFutures.add(future)
+
+			for future, filePath in futures:
+				if self.cancelRequested:
+					break
+
+				with self.downloadLock:
+					self.activeFutures.discard(future)
+
+				try:
+					ok, msg = future.result()
+					if ok:
+						successful.append(filePath)
+					else:
+						failed.append(filePath)
+				except Exception:
 					failed.append(filePath)
-					print("✗ " + filePath)
-			except Exception as err:  # noqa: BLE001
-				failed.append(filePath)
-				print(f"✗ {filePath} – {err}")
 
-	# Summary
-	print("\n=== Download Summary ===")
-	print(f"Total: {len(filesToDownload)}")
-	print(f"Successful: {len(successful)}")
-	print(f"Failed: {len(failed)}")
-	print(f"\nLocal model directory: {localModelDir}")
+		return successful, failed
 
-	return successful, failed
+	def __del__(self):
+		if hasattr(self, "session"):
+			self.session.close()
 
+# For backward compatibility
+def downloadModelsMultithreaded(*args, **kwargs):
+	downloader = ModelDownloader(remoteHost=kwargs.get('remoteHost', 'huggingface.co'))
+	# remove remoteHost from kwargs if present to avoid duplicate
+	if 'remoteHost' in kwargs:
+		del kwargs['remoteHost']
+	return downloader.downloadModelsMultithreaded(*args, **kwargs)
 
-def getModelFilePaths(
-	modelName: str = "Xenova/vit-gpt2-image-captioning",
-	basePath: str | None = None,
-) -> dict[str, str]:
-	"""
-	Return absolute paths for encoder / decoder / config / vocab.
-
-	:param modelName: Repository name.
-	:param basePath: Base folder for *models*.
-	"""
-	modelsDir = ensureModelsDirectory(basePath)
-	local = os.path.join(modelsDir, modelName)
-	return {
-		"encoderPath": os.path.join(local, "onnx", "encoder_model_quantized.onnx"),
-		"decoderPath": os.path.join(local, "onnx", "decoder_model_merged_quantized.onnx"),
-		"configPath": os.path.join(local, "config.json"),
-		"vocabPath": os.path.join(local, "vocab.json"),
-		"modelDir": local,
-	}
-
-
-# --------------------------------------------------------------------------- #
-# CLI Demo
-# --------------------------------------------------------------------------- #
-
-
-def _exampleProgress(fileName: str, done: int, total: int, pct: float) -> None:
-	"""
-	Simple CLI progress reporter.
-	"""
-	print(f"[PROGRESS] {fileName}: {pct:5.1f}% ({done:,}/{total:,} B)")
-
-
-def main() -> None:	 # pragma: no cover – CLI only
-	"""
-	Download the default model when executed as a script.
-	"""
-	modelsDir = ensureModelsDirectory()
-	ok, failed = downloadModelsMultithreaded(
-		modelsDir=modelsDir,
-		progressCallback=_exampleProgress,
-	)
-	if not failed:
-		print("\n🎉	All files downloaded successfully!")
-		for k, v in getModelFilePaths().items():
-			print(f"{k}: {v}")
-	else:
-		print("\n⚠️	 Some files failed to download:", failed)
-
-
-if __name__ == "__main__":
-	main()
+def ensureModelsDirectory(defaultPath: str) -> str:
+	downloader = ModelDownloader()
+	return downloader.ensureModelsDirectory(defaultPath)

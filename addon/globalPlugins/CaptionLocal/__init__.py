@@ -1,31 +1,34 @@
 # -*- coding: UTF-8 -*-
+# A part of NonVisual Desktop Access (NVDA)
+# Copyright (C) 2025 NV Access Limited, Tianze
+# This file may be used under the terms of the GNU General Public License, version 2 or later, as modified by the NVDA license.
+# For full terms and any additional permissions, see the NVDA license file: https://github.com/nvaccess/nvda/blob/master/copying.txt
+
 """Caption Local Global Plugin for NVDA.
 
 This plugin provides local image captioning functionality using ONNX models.
 It allows users to capture screen regions and generate captions using local AI models.
 """
 
-from __future__ import unicode_literals
-
 import os
 import sys
-from typing import Optional
-import base64
-import json
-import io
 import threading
+from typing import Optional
 
 import wx
 import gui
-from gui import guiHelper
 import globalVars
 import config
 import scriptHandler
-import ui
 import globalPluginHandler
-import api
 
-from .captioner import ImageCaptioner
+# Add libs directory to path
+_here = os.path.dirname(__file__)
+_libsDir = os.path.join(_here, "libs")
+if os.path.exists(_libsDir) and _libsDir not in sys.path:
+	sys.path.insert(0, _libsDir)
+
+from .imageDescriber import ImageDescriber
 from .modelManager import ModelManagerFrame
 from .panel import CaptionLocalSettingsPanel
 
@@ -37,8 +40,7 @@ except:
 
 # Module-level configuration
 _here = os.path.dirname(__file__)
-_modelsDir = os.path.join(_here, "..", "..", "models")
-_modelsDir = os.path.abspath(_modelsDir)
+_modelsDir = os.path.abspath(os.path.join(_here, "..", "..", "models"))
 
 CONFSPEC = {
 	"localModelPath": f"string(default={_modelsDir}/Xenova/vit-gpt2-image-captioning)",
@@ -47,55 +49,6 @@ CONFSPEC = {
 
 config.conf.spec['captionLocal'] = CONFSPEC
 
-
-def shootImage() -> bytes:
-	"""Capture a screenshot of the current navigator object.
-	
-	Returns:
-		The captured image data as bytes in JPEG format.
-	"""
-	# Get the currently focused object on screen
-	obj = api.getNavigatorObject()
-	
-	# Get the object's position and size information
-	x, y, width, height = obj.location
-	
-	# Create a bitmap with the same size as the object
-	bmp = wx.Bitmap(width, height)
-	
-	# Create a memory device context for drawing operations on the bitmap
-	mem = wx.MemoryDC(bmp)
-	
-	# Copy the specified screen region to the memory bitmap
-	mem.Blit(0, 0, width, height, wx.ScreenDC(), x, y)
-	
-	# Convert the bitmap to an image object for more flexible operations
-	image = bmp.ConvertToImage()
-	
-	# Create a byte stream object to save image data as binary data
-	body = io.BytesIO()
-	
-	# Save the image to the byte stream in JPEG format
-	image.SaveFile(body, wx.BITMAP_TYPE_JPEG)
-	
-	# Read the binary image data from the byte stream
-	imageData = body.getvalue()
-	return imageData
-
-
-def caption(captioner: ImageCaptioner, imageData: bytes) -> None:
-	"""Generate a caption for the given image data.
-	
-	Args:
-		captioner: The captioner instance to use for generation.
-		imageData: The image data to caption.
-	"""
-	try:
-		description = captioner.generate_caption(image=imageData)
-		ui.message(description)
-		api.copyToClip(text=description, notify=False)
-	except Exception as e:
-		ui.message(str(e))
 
 def disableInSecureMode(decoratedCls):
 	if globalVars.appArgs.secure:
@@ -114,19 +67,15 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def __init__(self) -> None:
 		"""Initialize the global plugin."""
 		super().__init__()
-		self.isModelLoaded = False
-		self.captioner: Optional[ImageCaptioner] = None
+		self.imageDescriber = ImageDescriber()
 		self.managerFrame: Optional[ModelManagerFrame] = None
-		
-		loadModelWhenInit = config.conf['captionLocal']['loadModelWhenInit']
-		# Load model when initializing plugin (may cause high memory usage)
-		if loadModelWhenInit:
-			threading.Thread(target=self._loadModel, daemon=True).start()
 		
 		gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(CaptionLocalSettingsPanel)
 
 	def terminate(self) -> None:
 		"""Clean up resources when the plugin is terminated."""
+		if self.imageDescriber:
+			self.imageDescriber.terminate()
 		try:
 			gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(CaptionLocalSettingsPanel)
 		except (ValueError, AttributeError):
@@ -140,71 +89,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		gesture="kb:NVDA+windows+,"
 	)
 	def script_runCaption(self, gesture) -> None:
-		"""Script to run image captioning on the current navigator object.
-		
-		Args:
-			gesture: The input gesture that triggered this script.
-		"""
-		imageData = shootImage()
-		
-		if not self.isModelLoaded:
-			# Translators: Message when loading the model
-			ui.message(_("loading model..."))
-			self._loadModel()
-		
-		imageThread = threading.Thread(target=caption, args=(self.captioner, imageData))
-		# Translators: Message when starting image recognition
-		ui.message(_("starting recognize"))
-		imageThread.start()
-
-	def _loadModel(self) -> None:
-		"""Load the ONNX model for image captioning.
-		
-		Raises:
-			Exception: If the model cannot be loaded.
-		"""
-		try:
-			localModelDirPath = config.conf['captionLocal']['localModelPath']
-			encoderPath = f"{localModelDirPath}/onnx/encoder_model_quantized.onnx"
-			decoderPath = f"{localModelDirPath}/onnx/decoder_model_merged_quantized.onnx"
-			configPath = f"{localModelDirPath}/config.json"
-			
-			self.captioner = ImageCaptioner(
-				encoder_path=encoderPath,
-				decoder_path=decoderPath,
-				config_path=configPath,
-			)
-			self.isModelLoaded = True
-		except Exception as e:
-			self.isModelLoaded = False
-			ui.message(str(e))
-			raise
+		"""Script to run image captioning on the current navigator object."""
+		self.imageDescriber.runCaption(gesture)
 
 	@scriptHandler.script(
 		# Translators: Description for the release model script
-		description=_("release local model"),
+		description=_("toggle local model"),
 		# Translators: Category of addon in input gestures.
 		category=_("Caption Local"),
 		gesture="kb:NVDA+windows+shift+,"
 	)
-	def script_releaseModel(self, gesture) -> None:
-		"""Script to release the loaded model from memory.
-		
-		Args:
-			gesture: The input gesture that triggered this script.
-		"""
-		# Translators: Message when releasing the model
-		ui.message(_("releasing model..."))
-		try:
-			if hasattr(self, 'captioner') and self.captioner:
-				del self.captioner
-				self.captioner = None
-				# Translators: Message when model is successfully released
-				ui.message(_("model released and memory freed"))
-				self.isModelLoaded = False
-		except Exception as e:
-			ui.message(str(e))
-			raise
+	def script_toggleModel(self, gesture) -> None:
+		"""Script to toggle the loaded model."""
+		self.imageDescriber.toggleImageCaptioning(gesture)
 
 	@scriptHandler.script(
 		# Translators: Description for the open model manager script
@@ -214,36 +111,26 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		gesture="kb:NVDA+windows+control+,"
 	)
 	def script_openManager(self, gesture) -> None:
-		"""Script to open the model manager window.
-		
-		Args:
-			gesture: The input gesture that triggered this script.
-		"""
-		# Translators: Message when opening model manager
-		ui.message(_("opening model manager..."))
+		"""Script to open the model manager window."""
 		try:
 			self._openModelManager()
 		except Exception as e:
+			import ui
 			ui.message(str(e))
-			raise
 
 	def _openModelManager(self) -> None:
 		"""Open the model manager frame window."""
 		def showManager() -> None:
 			"""Show the model manager window."""
 			try:
-				# Use existing wx.App if available
-				app = wx.GetApp()
-				if app is None:
-					app = wx.App()
-				
-				if not hasattr(self, 'managerFrame') or not self.managerFrame:
+				if not self.managerFrame:
 					self.managerFrame = ModelManagerFrame()
 				
 				self.managerFrame.Show()
 				self.managerFrame.Raise()
 				
 			except Exception as e:
+				import ui
 				ui.message(str(e))
 		
 		# Ensure execution in main thread
