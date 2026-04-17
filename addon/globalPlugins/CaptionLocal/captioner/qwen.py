@@ -6,7 +6,7 @@
 
 import os
 import subprocess
-import base64
+import tempfile
 from logHandler import log
 from .base import ImageCaptioner
 
@@ -52,18 +52,24 @@ class QwenImageCaptioner(ImageCaptioner):
 		:param image: Image file path or binary data.
 		:param maxLength: Optional maximum tokens.
 		"""
-		if isinstance(image, bytes):
-			imgData = image
+		temp_file_path = None
+		if isinstance(image, str) and os.path.exists(image):
+			image_path = image
 		else:
-			with open(image, "rb") as f:
-				imgData = f.read()
-
-		imgB64 = base64.b64encode(imgData).decode("utf-8")
+			# If image is bytes or a path that doesn't exist, save to a temp file
+			with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+				if isinstance(image, bytes):
+					tmp.write(image)
+				else:
+					with open(image, "rb") as f:
+						tmp.write(f.read())
+				temp_file_path = tmp.name
+				image_path = temp_file_path
 
 		cmd = [
 			self.cliPath,
 			"--prompt", self.prompt,
-			"--base64-image", imgB64,
+			"--image", image_path,
 			"--model-dir", self.modelDir,
 		]
 
@@ -92,3 +98,10 @@ class QwenImageCaptioner(ImageCaptioner):
 		except Exception as e:
 			log.exception("Error running miniqwen-cli")
 			raise
+		finally:
+			# Clean up temporary file if created
+			if temp_file_path and os.path.exists(temp_file_path):
+				try:
+					os.remove(temp_file_path)
+				except Exception:
+					log.exception(f"Failed to remove temp file: {temp_file_path}")
