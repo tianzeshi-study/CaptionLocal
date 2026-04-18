@@ -2,6 +2,42 @@
 	"version": "1.0",
 	"models": [
 		{
+			"id": "onnx-community/Qwen3.5-0.8B-ONNX",
+			"name": "Qwen 3.5-0.8B (local cli)",
+			"resolvePath": "/resolve/main",
+			"files": [
+				"config.json",
+				"generation_config.json",
+				"preprocessor_config.json",
+				"tokenizer.json",
+				"tokenizer_config.json",
+				"onnx/decoder_model_merged_q4.onnx",
+				"onnx/decoder_model_merged_q4.onnx_data",
+				"onnx/embed_tokens_q4.onnx",
+				"onnx/embed_tokens_q4.onnx_data",
+				"onnx/vision_encoder_fp16.onnx",
+				"onnx/vision_encoder_fp16.onnx_data"
+			]
+		},
+		{
+			"id": "onnx-community/Qwen3.5-2B-ONNX",
+			"name": "Qwen 3.5-2B (local cli)",
+			"resolvePath": "/resolve/main",
+			"files": [
+				"config.json",
+				"generation_config.json",
+				"preprocessor_config.json",
+				"tokenizer.json",
+				"tokenizer_config.json",
+				"onnx/decoder_model_merged_q4.onnx",
+				"onnx/decoder_model_merged_q4.onnx_data",
+				"onnx/embed_tokens_q4.onnx",
+				"onnx/embed_tokens_q4.onnx_data",
+				"onnx/vision_encoder_fp16.onnx",
+				"onnx/vision_encoder_fp16.onnx_data"
+			]
+		},
+		{
 			"id": "Xenova/vit-gpt2-image-captioning",
 			"name": "Vit-GPT2 Image Captioning (Xenova)",
 			"resolvePath": "/resolve/main",
@@ -22,24 +58,6 @@
 				"config.json",
 				"preprocessor_config.json"
 			]
-		},
-		{
-			"id": "onnx-community/Qwen3.5-0.8B-ONNX",
-			"name": "Qwen 3.5-0.8B (local cli)",
-			"resolvePath": "/resolve/main",
-			"files": [
-				"config.json",
-				"generation_config.json",
-				"preprocessor_config.json",
-				"tokenizer.json",
-				"tokenizer_config.json",
-				"onnx/decoder_model_merged_q4.onnx",
-				"onnx/decoder_model_merged_q4.onnx_data",
-				"onnx/embed_tokens_q4.onnx",
-				"onnx/embed_tokens_q4.onnx_data",
-				"onnx/vision_encoder_fp16.onnx",
-				"onnx/vision_encoder_fp16.onnx_data"
-			]
 		}
-	]
+			]
 }
