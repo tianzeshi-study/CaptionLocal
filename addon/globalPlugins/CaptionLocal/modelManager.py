@@ -346,9 +346,28 @@ class ModelManagerFrame(wx.Frame):
 		import config
 		from logHandler import log
 		try:
-			config.conf["captionLocal"]["modelsDir"] = self.pathCtrl.GetValue()
-			config.conf["captionLocal"]["currentModel"] = self.modelName
-			self.log(_("✅ Active model set to: {modelName}").format(modelName=self.modelName))
+			modelsDir = self.pathCtrl.GetValue()
+			newModelId = self.modelName
+			
+			# Check if we need to release the current model
+			try:
+				import globalPluginHandler
+				from .imageDescriber import ImageDescriber
+				# We need to find the instance of our global plugin
+				for plugin in globalPluginHandler.runningPlugins:
+					if hasattr(plugin, "imageDescriber") and isinstance(plugin.imageDescriber, ImageDescriber):
+						# If model is loaded, we might want to release it first
+						# especially if the model ID is different
+						if plugin.imageDescriber.isModelLoaded:
+							# Trigger a switch off
+							plugin.imageDescriber.toggleSwitch()
+						break
+			except Exception as e:
+				log.debug(f"Could not release previous model automatically: {e}")
+
+			config.conf["captionLocal"]["modelsDir"] = modelsDir
+			config.conf["captionLocal"]["currentModel"] = newModelId
+			self.log(_("✅ Active model set to: {modelName}").format(modelName=newModelId))
 			SoundNotification.playSuccess()
 		except Exception as e:
 			log.error(f"Failed to set active model: {e}")
