@@ -32,10 +32,12 @@ jobs:
           pip install -r requirements.txt
           if ("${{ matrix.python-version }}" -eq "3.11") {
             pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs --platform win32 --only-binary=:all: --no-binary=:none:
+            pip install miniqinference[cli]==0.1.2 --target ./addon/globalPlugins/CaptionLocal/libs --upgrade --platform win_amd64 --only-binary=:all: --no-binary=:none: 
           } else {
             pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs 
+            pip install miniqinference[cli]==0.1.2 --target ./addon/globalPlugins/CaptionLocal/libs --upgrade --platform win_amd64 --only-binary=:all: --no-binary=:none: 
           }
-          pip install miniqinference[cli]==0.1.2 --target ./addon/globalPlugins/CaptionLocal/libs --upgrade 
+          
       - name: Code checks
         run: |
           $env:SKIP="no-commit-to-branch"
