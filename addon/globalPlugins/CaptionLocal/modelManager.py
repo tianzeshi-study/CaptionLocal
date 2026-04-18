@@ -24,6 +24,23 @@ except:
 MODELS_CONFIG_URL = "https://raw.githubusercontent.com/tianzeshi-study/CaptionLocal/master/addon/globalPlugins/CaptionLocal/models.json"
 MODELS_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "models.json")
 
+
+def _closeWindowOnEscape(window: wx.TopLevelWindow) -> None:
+	if isinstance(window, wx.Dialog) and window.IsModal():
+		window.EndModal(wx.ID_CANCEL)
+		return
+	window.Close()
+
+
+def _bindEscapeToClose(window: wx.TopLevelWindow) -> None:
+	def onCharHook(event: wx.KeyEvent) -> None:
+		if event.GetKeyCode() == wx.WXK_ESCAPE:
+			_closeWindowOnEscape(window)
+			return
+		event.Skip()
+
+	window.Bind(wx.EVT_CHAR_HOOK, onCharHook)
+
 class AdvancedSettingsDialog(wx.Dialog):
 	"""Advanced Settings Dialog for model download configuration."""
 	
@@ -46,6 +63,7 @@ class AdvancedSettingsDialog(wx.Dialog):
 		
 		self._initUI()
 		self._bindEvents()
+		_bindEscapeToClose(self)
 		
 	def _initUI(self):
 		mainSizer = wx.BoxSizer(wx.VERTICAL)
@@ -98,6 +116,7 @@ class AdvancedSettingsDialog(wx.Dialog):
 		
 	def onAddFile(self, event):
 		dlg = wx.TextEntryDialog(self, _("Enter file path:"), _("Add File"))
+		_bindEscapeToClose(dlg)
 		if dlg.ShowModal() == wx.ID_OK:
 			filePath = dlg.GetValue().strip()
 			if filePath and filePath not in self.filesList:
@@ -177,6 +196,7 @@ class ModelManagerFrame(wx.Frame):
 		self._initUI()
 		self._initDefaultPath()
 		self._bindEvents()
+		_bindEscapeToClose(self)
 		self.Centre()
 		
 	def _initUI(self):
@@ -293,6 +313,7 @@ class ModelManagerFrame(wx.Frame):
 	
 	def onBrowsePath(self, event):
 		dlg = wx.DirDialog(self, _("Select Download Directory"), defaultPath=self.pathCtrl.GetValue())
+		_bindEscapeToClose(dlg)
 		if dlg.ShowModal() == wx.ID_OK:
 			self.pathCtrl.SetValue(dlg.GetPath())
 		dlg.Destroy()
