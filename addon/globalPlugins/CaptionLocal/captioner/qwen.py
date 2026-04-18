@@ -15,8 +15,15 @@ try:
 except NameError:
 	_ = lambda x: x
 
+try:
+	from logHandler import log
+	import addonHandler
+	addonHandler.initTranslation()
+except:
+	pass
+
 # Translators: default prompt for image captioning
-DEFAULT_PROMPT = _("请一句话描述图片")
+DEFAULT_PROMPT = _("Please describe the picture in one sentence")
 
 
 class QwenImageCaptioner(ImageCaptioner):
