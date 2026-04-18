@@ -1,8 +1,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-07-02 18:15+0800\n"
+"Report-Msgid-Bugs-To: 'nvda-translations@groups.io'\n"
+"POT-Creation-Date: 2026-04-18 17:06+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -11,8 +11,267 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#. Translators: A message presented in the settings panel when opened while no-default profile is active.
-#: panel.py:29
+#. Translators: Description for the image caption script
+#: addon\globalPlugins\CaptionLocal\__init__.py:87
+msgid "image caption using local model"
+msgstr ""
+
+#. Translators: Category of addon in input gestures.
+#: addon\globalPlugins\CaptionLocal\__init__.py:89
+#: addon\globalPlugins\CaptionLocal\__init__.py:100
+#: addon\globalPlugins\CaptionLocal\__init__.py:111
+msgid "Caption Local"
+msgstr ""
+
+#. Translators: Description for the release model script
+#: addon\globalPlugins\CaptionLocal\__init__.py:98
+msgid "toggle local model"
+msgstr ""
+
+#. Translators: Description for the open model manager script
+#: addon\globalPlugins\CaptionLocal\__init__.py:109
+msgid "open model manager"
+msgstr ""
+
+#. Translators: error message when an image description cannot be generated
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:77
+msgid "Failed to generate description"
+msgstr ""
+
+#. Translators: Presented when an AI image description has been generated.
+#. {description} will be replaced with the generated image description.
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:84
+#, python-brace-format
+msgid "Could be: {description}"
+msgstr ""
+
+#. In the addon, we might want to just load it or show a message
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:128
+msgid "loading model..."
+msgstr ""
+
+#. Translators: Message when starting image recognition
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:142
+msgid "getting image description..."
+msgstr ""
+
+#. In the addon, we can use the ModelManager to download
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:171
+msgid "Model not found. Please use Model Manager to download."
+msgstr ""
+
+#. Translators: error message when fail to load model
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:175
+msgid "failed to load image captioner"
+msgstr ""
+
+#. Translators: Message when successfully load the model
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:180
+msgid "image captioning on"
+msgstr ""
+
+#. Translators: Message when image captioning terminates
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:199
+msgid "image captioning off"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:50
+msgid "Advanced Settings"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:74
+msgid "Model Name:"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:78
+msgid "Resolve Path:"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:82
+msgid "Use Mirror (hf-mirror.com)"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:87
+msgid "Model Config"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:91
+msgid "Files to Download:"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:98
+#: addon\globalPlugins\CaptionLocal\modelManager.py:118
+msgid "Add File"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:99
+msgid "Remove File"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:105
+msgid "File List"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:118
+msgid "Enter file path:"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:174
+msgid "Model Manager"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:206
+msgid "Model Download Manager"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:213
+msgid "Model Selection"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:215
+msgid "Select Model:"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:223
+msgid "Update Models List"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:228
+msgid "Model Directory Settings"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:230
+msgid "Models Directory:"
+msgstr ""
+
+#. Translators: The label of a button to browse for a directory or a file.
+#: addon\globalPlugins\CaptionLocal\modelManager.py:233
+#: addon\globalPlugins\CaptionLocal\panel.py:64
+msgid "Browse..."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:238
+msgid "Model Information"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:239
+#: addon\globalPlugins\CaptionLocal\modelManager.py:329
+#: addon\globalPlugins\CaptionLocal\modelManager.py:337
+#: addon\globalPlugins\CaptionLocal\modelManager.py:380
+#, python-brace-format
+msgid "Model: {modelName}"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:241
+#: addon\globalPlugins\CaptionLocal\modelManager.py:330
+#: addon\globalPlugins\CaptionLocal\modelManager.py:338
+#: addon\globalPlugins\CaptionLocal\modelManager.py:381
+#, python-brace-format
+msgid "File Count: {count}"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:246
+msgid "Advanced Settings..."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:247
+msgid "Set as Active Model"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:251
+#: addon\globalPlugins\CaptionLocal\modelManager.py:443
+msgid "Start Download"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:255
+msgid "Ready"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:258
+msgid "Download Log"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:312
+#, python-brace-format
+msgid "file: {fileName}  progress: {progress:.2f}%"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:315
+msgid "Select Download Directory"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:342
+msgid "Updating models list..."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:351
+#, python-brace-format
+msgid "✅ Active model set to: {modelName}"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:355
+msgid "❌ Failed to set active model."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:368
+msgid "Invalid configuration format."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:382
+msgid "Models list updated successfully."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:387
+#, python-brace-format
+msgid "Failed to update models list: {error}"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:395
+msgid "Cancelling download..."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:398
+msgid "Cancel Download"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:406
+msgid "Downloading..."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:421
+msgid "Download cancelled."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:422
+msgid "Cancelled"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:424
+msgid "✅ All files downloaded successfully!"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:425
+msgid "Completed"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:432
+msgid "❌ Download failed for some files."
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:433
+msgid "Failed"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:436
+#, python-brace-format
+msgid "Error: {error}"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:437
+msgid "Error"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\panel.py:37
 #, python-brace-format
 msgid ""
 "{name} add-on can only be configured from the Normal Configuration profile.\n"
@@ -20,378 +279,36 @@ msgid ""
 msgstr ""
 
 #. Translators: This is a label for an edit field in the CaptionLocal Settings panel.
-#: panel.py:45
-msgid "model path"
-msgstr ""
-
-#. Translators: The label of a button to browse for a directory or a file.
-#: panel.py:51
-msgid "Browse..."
+#: addon\globalPlugins\CaptionLocal\panel.py:57
+msgid "models directory"
 msgstr ""
 
 #. Translators: The title of the dialog presented when browsing for the directory.
-#: panel.py:53
+#: addon\globalPlugins\CaptionLocal\panel.py:66
 msgid "Select a directory"
 msgstr ""
 
 #. Translators: A setting in addon settings dialog.
-#: panel.py:59
+#: addon\globalPlugins\CaptionLocal\panel.py:74
 msgid "load model when init (may cause high use of memory)"
 msgstr ""
 
-#. Translators: Description for the image caption script
-#: __init__.py:137
-msgid "image caption using local model"
+#. Translators: default prompt for image captioning
+#: addon\globalPlugins\CaptionLocal\captioner\qwen.py:26
+msgid "Please describe the picture in one sentence"
 msgstr ""
 
-#. Translators: Category of addon in input gestures.
-#: __init__.py:139 __init__.py:187 __init__.py:213
-msgid "Caption Local"
+#. Add-on summary, usually the user visible name of the addon.
+#. Translators: Summary for this add-on
+#. to be shown on installation and add-on information found in Add-ons Manager.
+#: buildVars.py:23
+msgid "caption  image useing local AI models"
 msgstr ""
 
-#. Translators: Message when loading the model
-#: __init__.py:152
-msgid "loading model..."
-msgstr ""
-
-#. Translators: Message when starting image recognition
-#: __init__.py:157
-msgid "starting recognize"
-msgstr ""
-
-#. Translators: Description for the release model script
-#: __init__.py:185
-msgid "release local model"
-msgstr ""
-
-#. Translators: Message when releasing the model
-#: __init__.py:197
-msgid "releasing model..."
-msgstr ""
-
-#. Translators: Message when model is successfully released
-#: __init__.py:203
-msgid "model released and memory freed"
-msgstr ""
-
-#. Translators: Description for the open model manager script
-#: __init__.py:211
-msgid "open model manager"
-msgstr ""
-
-#. Translators: Message when opening model manager
-#: __init__.py:223
-msgid "opening model manager..."
-msgstr ""
-
-#. Translators: Logged when the local models directory is created / found.
-#: modelDownloader.py:70
-#, python-brace-format
-msgid "Models directory ensured:{modelsDir} "
-msgstr ""
-
-#. Translators: Logged when download is skipped because the file exists.
-#: modelDownloader.py:131
-#, python-brace-format
-msgid "[Thread-{threadId}] File already exists:\t {localPath}"
-msgstr ""
-
-#: modelDownloader.py:138
+#. Add-on description
+#. Translators: Long description to be shown for this add-on on add-on information from add-ons manager
+#: buildVars.py:26
 msgid ""
-"[Thread-{threadId}] Downloading (attempt {attempt + 1}/{maxRetries}): {url}"
-msgstr ""
-
-#: modelDownloader.py:147
-msgid "[Thread-{id}] File size: {size:,} bytes"
-msgstr ""
-
-#: modelDownloader.py:182
-#, python-brace-format
-msgid "[Thread-{id}] Successfully downloaded: "
-msgstr ""
-
-#: modelDownloader.py:239
-msgid ""
-"Starting download of {len(filesToDownload)} files for model: {modelName}\n"
-"Remote host: {remoteHost}\n"
-"Max workers: {maxWorkers}"
-msgstr ""
-
-#. Translators: A message presented in the settings panel
-#: modelManager.py:49
-msgid "Advanced Settings"
-msgstr ""
-
-#. Translators: Label for model name input field
-#: modelManager.py:78
-msgid "Model Name:"
-msgstr ""
-
-#. Translators: Label for resolve path input field
-#: modelManager.py:84
-msgid "Resolve Path:"
-msgstr ""
-
-#. Translators: Checkbox label for using HuggingFace mirror
-#: modelManager.py:90
-msgid "Use HuggingFace Mirror"
-msgstr ""
-
-#. Translators: Tab label for model configuration
-#: modelManager.py:96
-msgid "Model Config"
-msgstr ""
-
-#. Translators: Label for file list section
-#: modelManager.py:103
-msgid "Files to Download:"
-msgstr ""
-
-#. Translators: Button label for adding a file
-#: modelManager.py:116 modelManager.py:156
-msgid "Add File"
-msgstr ""
-
-#. Translators: Button label for removing a file
-#: modelManager.py:118
-msgid "Remove File"
-msgstr ""
-
-#. Translators: Tab label for file list
-#: modelManager.py:125
-msgid "File List"
-msgstr ""
-
-#. Translators: OK button text
-#: modelManager.py:132
-msgid "OK"
-msgstr ""
-
-#. Translators: Cancel button text
-#: modelManager.py:134
-msgid "Cancel"
-msgstr ""
-
-#. Translators: Dialog title for adding a file
-#. Translators: Prompt text for entering file path
-#: modelManager.py:156
-msgid "Enter file path:"
-msgstr ""
-
-#. Translators: Main window title
-#: modelManager.py:255
-msgid "Model Manager"
-msgstr ""
-
-#. Translators: Main application title text
-#: modelManager.py:287
-msgid "Model Download Manager"
-msgstr ""
-
-#. Translators: Group box label for download settings
-#: modelManager.py:296
-msgid "Download Settings"
-msgstr ""
-
-#. Translators: Label for download path field
-#: modelManager.py:300
-msgid "Download Path:"
-msgstr ""
-
-#. Translators: Group box label for model information
-#: modelManager.py:314
-msgid "Model Information"
-msgstr ""
-
-#. Translators: Model name display format
-#: modelManager.py:317 modelManager.py:470
-#, python-brace-format
-msgid "Model: {modelName}"
-msgstr ""
-
-#. Translators: File count display format
-#: modelManager.py:321 modelManager.py:472
-#, python-brace-format
-msgid "File Count: {count}"
-msgstr ""
-
-#. Translators: Button label for advanced settings
-#: modelManager.py:330
-msgid "Advanced Settings..."
-msgstr ""
-
-#. Translators: Button label for starting download
-#: modelManager.py:336
-msgid "Start Download"
-msgstr ""
-
-#. Translators: Initial status text
-#: modelManager.py:345
-msgid "Ready"
-msgstr ""
-
-#. Translators: Group box label for download log
-#: modelManager.py:350
-msgid "Download Log"
-msgstr ""
-
-#. Translators: Log message for default path initialization
-#: modelManager.py:365
-#, python-brace-format
-msgid "Default download path: {path}"
-msgstr ""
-
-#. Translators: Log message for path initialization failure
-#: modelManager.py:368
-#, python-brace-format
-msgid "Failed to initialize path: {error}"
-msgstr ""
-
-#. Translators: Progress log message format
-#: modelManager.py:435
-#, python-brace-format
-msgid "file: {fileName}  progress: {progress:.2f}%"
-msgstr ""
-
-#. Translators: Directory selection dialog title
-#: modelManager.py:445
-msgid "Select Download Directory"
-msgstr ""
-
-#. Translators: Log message for path change
-#: modelManager.py:450
-#, python-brace-format
-msgid "Download path changed to: {path}"
-msgstr ""
-
-#. Translators: Mirror usage indicator
-#: modelManager.py:475
-msgid " (using mirror)"
-msgstr ""
-
-#. Translators: Settings update log message
-#: modelManager.py:477
-#, python-brace-format
-msgid "Settings updated: {modelName}{mirrorInfo}, {count} files"
-msgstr ""
-
-#. Translators: Log message when download is already in progress
-#: modelManager.py:490
-msgid "Download in progress..."
-msgstr ""
-
-#. Translators: Error message for no files selected
-#: modelManager.py:497
-msgid "❌ Error: Please select files to download in Advanced Settings"
-msgstr ""
-
-#. Translators: Status message for no files selected
-#: modelManager.py:499
-msgid "Error: No files selected"
-msgstr ""
-
-#. Translators: Status message during download
-#: modelManager.py:518
-msgid "Downloading..."
-msgstr ""
-
-#. Translators: Log message for download start
-#: modelManager.py:520
-msgid "Starting model file download..."
-msgstr ""
-
-#. Translators: Log message for remote host
-#: modelManager.py:526
-#, python-brace-format
-msgid "Remote host: {host}"
-msgstr ""
-
-#. Translators: Log message for model name
-#: modelManager.py:528
-#, python-brace-format
-msgid "Model name: {name}"
-msgstr ""
-
-#. Translators: Log message for download path
-#: modelManager.py:531
-#, python-brace-format
-msgid "Download path: {path}"
-msgstr ""
-
-#. Translators: Log message for file count
-#: modelManager.py:533
-#, python-brace-format
-msgid "File count: {count}"
-msgstr ""
-
-#. Translators: Log message for download progress
-#: modelManager.py:535
-msgid "Downloading... please wait"
-msgstr ""
-
-#. Translators: Log message for download error
-#: modelManager.py:557
-#, python-brace-format
-msgid "Error during download: {error}"
-msgstr ""
-
-#. Translators: Status message for download failure
-#: modelManager.py:559 modelManager.py:589
-msgid "Download failed"
-msgstr ""
-
-#. Translators: Success message for all files downloaded
-#: modelManager.py:576
-#, python-brace-format
-msgid "✅ All files downloaded successfully! ({success}/{total})"
-msgstr ""
-
-#. Translators: Status message for completed download
-#: modelManager.py:579
-msgid "Download completed"
-msgstr ""
-
-#. Translators: Error message for all files failed
-#: modelManager.py:584
-#, python-brace-format
-msgid "❌ All files download failed! ({failed}/{total})"
-msgstr ""
-
-#. Translators: Log message for failed files list
-#: modelManager.py:587
-#, python-brace-format
-msgid "Failed files: {files}"
-msgstr ""
-
-#. Translators: Warning message for partial download success
-#: modelManager.py:594
-#, python-brace-format
-msgid "⚠️ Partial download success ({success}/{total})"
-msgstr ""
-
-#. Translators: Log message for successful files count
-#: modelManager.py:597
-#, python-brace-format
-msgid "Successful: {count} files"
-msgstr ""
-
-#. Translators: Log message for failed files count and list
-#: modelManager.py:599
-#, python-brace-format
-msgid "Failed: {count} files - {files}"
-msgstr ""
-
-#. Translators: Status message for partial completion
-#: modelManager.py:602
-msgid "Partially completed"
-msgstr ""
-
-#. Translators: Confirmation dialog message for exit during download
-#. Translators: Confirmation dialog title for exit
-#: modelManager.py:619
-msgid "Download is in progress. Are you sure you want to exit?"
-msgstr ""
-
-#: modelManager.py:620
-msgid "Confirm Exit"
+"generate caption  for image using local AI models, Describe the image "
+"objects browsed by NVDA, support shortcut key recognition. "
 msgstr ""

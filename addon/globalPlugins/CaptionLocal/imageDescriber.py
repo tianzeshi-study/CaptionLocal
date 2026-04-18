@@ -83,7 +83,7 @@ def _messageCaption(captioner: ImageCaptioner, imageData: bytes) -> None:
 			# {description} will be replaced with the generated image description.
 			_("Could be: {description}").format(description=description),
 		)
-		api.copyToClip(text=description, notify=False)
+		wx.CallAfter(api.copyToClip(text=description, notify=False))
 
 
 class ImageDescriber:

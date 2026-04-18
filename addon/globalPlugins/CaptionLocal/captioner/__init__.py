@@ -5,6 +5,7 @@
 # For full terms and any additional permissions, see the NVDA license file: https://github.com/nvaccess/nvda/blob/master/copying.txt
 
 import json
+import os
 
 from logHandler import log
 from .base import ImageCaptioner
@@ -17,11 +18,6 @@ def imageCaptionerFactory(
 	monomericModelPath: str | None = None,
 ) -> ImageCaptioner:
 	"""Initialize the image caption generator."""
-	if not monomericModelPath and not (encoderPath and decoderPath):
-		raise ValueError(
-			"You must provide either 'monomericModelPath' or both 'encoderPath' and 'decoderPath'.",
-		)
-
 	try:
 		with open(configPath, "r", encoding="utf-8") as f:
 			config = json.load(f)
@@ -34,10 +30,15 @@ def imageCaptionerFactory(
 		log.exception("config file not found")
 		raise
 
-	modelArchitecture = config["architectures"][0]
+	modelArchitecture = config.get("architectures", [""])[0]
 	if modelArchitecture == "VisionEncoderDecoderModel":
+		if not (encoderPath and decoderPath):
+			raise ValueError("VisionEncoderDecoderModel requires both encoderPath and decoderPath")
 		from .vitGpt2 import VitGpt2ImageCaptioner
-
 		return VitGpt2ImageCaptioner(encoderPath, decoderPath, configPath)
+	elif modelArchitecture == "Qwen3_5ForConditionalGeneration":
+		from .qwen import QwenImageCaptioner
+		modelDir = os.path.dirname(configPath)
+		return QwenImageCaptioner(modelDir)
 	else:
-		raise NotImplementedError("Unsupported model architectures")
+		raise NotImplementedError(f"Unsupported model architecture: {modelArchitecture}")

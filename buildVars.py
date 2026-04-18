@@ -25,7 +25,7 @@ addon_info = {
 	# Translators: Long description to be shown for this add-on on add-on information from add-ons manager
 	"addon_description" : _("generate caption  for image using local AI models, Describe the image objects browsed by NVDA, support shortcut key recognition. "),
 	# version
-	"addon_version" : "0.1.0",
+	"addon_version" : "0.2.0",
 	# Author(s)
 	"addon_author" : "tianze <tianzeshi_study@outlook.com>",
 	# URL for the add-on documentation support
@@ -58,6 +58,7 @@ addon_info = {
 # https://scons.org/doc/production/HTML/scons-user/apd.html
 pythonSources = [
 	'addon/globalPlugins/*/*.py',
+	'addon/globalPlugins/*/*/*.py',
 ]
 
 # Files that contain strings for translation. Usually your python sources

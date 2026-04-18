@@ -11,27 +11,43 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - python-version: "3.11"
+            architecture: "x86"
+          - python-version: "3.13"
+            architecture: "x64"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.architecture }}
           cache: pip
       - name: Install dependencies
         run: |
           pip install --upgrade pip wheel
           pip install -r requirements.txt
-          pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs --platform win32 --only-binary=:all: --no-binary=:none:
+          if ("${{ matrix.python-version }}" -eq "3.11") {
+            pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs --platform win32 --only-binary=:all: --no-binary=:none:
+            pip install miniqinference[cli]==0.1.2 --target ./addon/globalPlugins/CaptionLocal/libs --upgrade --platform win_amd64 --only-binary=:all: --no-binary=:none: 
+          } else {
+            pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs 
+            pip install miniqinference[cli]==0.1.2 --target ./addon/globalPlugins/CaptionLocal/libs --upgrade --platform win_amd64 --only-binary=:all: --no-binary=:none: 
+          }
+          
       - name: Code checks
         run: |
           $env:SKIP="no-commit-to-branch"
           pre-commit run --all
       - name: building addon
-        run: scons
+        run: scons version="0.1.0-${{ matrix.python-version }}-${{ matrix.architecture }}"
+        shell: pwsh
       - uses: actions/upload-artifact@v4
         with:
-          name: packaged_addon
+          name: packaged_addon-${{ matrix.python-version }}-${{ matrix.architecture }}
           path: ./*.nvda-addon
 
   upload_release:
@@ -40,10 +56,12 @@ jobs:
     needs: build
 
     steps:
-      - name: Download addon artifact
+      - name: Download all addon artifacts
         uses: actions/download-artifact@v4
         with:
-          name: packaged_addon
+          path: artifacts
+          pattern: packaged_addon-*
+          merge-multiple: true
 
       - name: List files for debug
         run: ls -R .
@@ -51,8 +69,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # files: 'packaged_addon/*.nvda-addon'
-          files: '*.nvda-addon'
+          files: artifacts/*.nvda-addon
           make_latest: true
           body: "New release from ${{ github.ref_name }}"
         env:
