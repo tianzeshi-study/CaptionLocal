@@ -70,6 +70,10 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		super().__init__()
 		self.imageDescriber = ImageDescriber()
 		self.managerFrame: Optional[ModelManagerFrame] = None
+		self.menu = gui.mainFrame.sysTrayIcon.toolsMenu
+		self.manager_item = self.menu.Append(wx.ID_ANY, _("Model Manager"))
+		gui.mainFrame.sysTrayIcon.Bind(wx.EVT_MENU, self.script_openManager, self.manager_item)
+
 		
 		gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(CaptionLocalSettingsPanel)
 
