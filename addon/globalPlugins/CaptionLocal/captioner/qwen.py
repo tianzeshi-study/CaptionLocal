@@ -7,6 +7,8 @@
 import os
 import subprocess
 import tempfile
+import io
+from PIL import Image
 from logHandler import log
 from .base import ImageCaptioner
 
@@ -28,6 +30,8 @@ DEFAULT_PROMPT = _("Please describe the picture in one sentence")
 
 class QwenImageCaptioner(ImageCaptioner):
 	"""Implementation of ImageCaptioner using miniqwen-cli.exe."""
+
+	MAX_IMAGE_SIZE = 512
 
 	def __init__(
 		self,
@@ -55,23 +59,51 @@ class QwenImageCaptioner(ImageCaptioner):
 		maxLength: int | None = None,
 	) -> str:
 		"""Generate image caption using CLI.
-		
+
 		:param image: Image file path or binary data.
 		:param maxLength: Optional maximum tokens.
 		"""
 		temp_file_path = None
-		if isinstance(image, str) and os.path.exists(image):
-			image_path = image
-		else:
-			# If image is bytes or a path that doesn't exist, save to a temp file
-			with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-				if isinstance(image, bytes):
-					tmp.write(image)
+		image_path = None
+
+		try:
+			# Load the image
+			if isinstance(image, str) and os.path.exists(image):
+				img = Image.open(image)
+			elif isinstance(image, bytes):
+				img = Image.open(io.BytesIO(image))
+			else:
+				# If it's a string but doesn't exist, it might be intended as bytes or error
+				if isinstance(image, str):
+					raise FileNotFoundError(f"Image file not found: {image}")
+				raise ValueError(f"Unsupported image type: {type(image)}")
+
+			# Resize if larger than MAX_IMAGE_SIZE
+			width, height = img.size
+			if max(width, height) > self.MAX_IMAGE_SIZE:
+				img.thumbnail((self.MAX_IMAGE_SIZE, self.MAX_IMAGE_SIZE), Image.Resampling.LANCZOS)
+				# Save to a temporary JPEG file
+				with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+					if img.mode != "RGB":
+						img = img.convert("RGB")
+					img.save(tmp, format="JPEG")
+					temp_file_path = tmp.name
+					image_path = temp_file_path
+			else:
+				# If image is a string path and small enough, use it directly
+				if isinstance(image, str):
+					image_path = image
 				else:
-					with open(image, "rb") as f:
-						tmp.write(f.read())
-				temp_file_path = tmp.name
-				image_path = temp_file_path
+					# If it's bytes and small enough, still need to save to a temp file
+					with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+						if img.mode != "RGB":
+							img = img.convert("RGB")
+						img.save(tmp, format="JPEG")
+						temp_file_path = tmp.name
+						image_path = temp_file_path
+		except Exception as e:
+			log.exception(f"Error processing image for Qwen: {e}")
+			raise
 
 		cmd = [
 			self.cliPath,
