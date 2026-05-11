@@ -59,6 +59,7 @@ addon_info = {
 pythonSources = [
 	'addon/globalPlugins/*/*.py',
 	'addon/globalPlugins/*/*/*.py',
+	'addon/globalPlugins/*.py'
 ]
 
 # Files that contain strings for translation. Usually your python sources
