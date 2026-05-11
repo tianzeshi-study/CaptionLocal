@@ -120,15 +120,13 @@ class ImageDescriber(ContentRecognizer):
 				self._current_text += token
 				self._update_result()
 
-			# Initial empty result to set focus
-			self._update_result()
-
 			final_caption = self.captioner.generateCaption(
 				image=imageData,
 				onToken=on_token
 			)
-			# Ensure final text is set (though on_token should have handled it)
-			self._current_text = final_caption
+			# Final update to ensure UI is shown and text is correct
+			if final_caption and not self._current_text:
+				self._current_text = final_caption
 			self._update_result()
 			
 			# Copy to clipboard at the end
@@ -155,8 +153,9 @@ class ImageDescriber(ContentRecognizer):
 				queueHandler.queueFunction(queueHandler.eventQueue, ui_obj._onResult, result)
 			else:
 				queueHandler.queueFunction(queueHandler.eventQueue, onResult, result)
-		else:
+		elif self._current_text:
 			# First result (or not a refreshable object)
+			# Only show UI if we have text
 			queueHandler.queueFunction(queueHandler.eventQueue, onResult, result)
 
 	def cancel(self):

@@ -126,20 +126,36 @@ class QwenImageCaptioner(ImageCaptioner):
 			startupinfo = subprocess.STARTUPINFO()
 			startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-			result = subprocess.check_output(
+			# Use Popen to allow streaming output
+			process = subprocess.Popen(
 				cmd,
+				stdout=subprocess.PIPE,
 				stderr=subprocess.STDOUT,
 				universal_newlines=True,
 				encoding="utf-8",
 				startupinfo=startupinfo,
+				bufsize=1, # Line buffered
 			)
-			res_text = result.strip()
-			if onToken and res_text:
-				onToken(res_text)
+
+			full_text = []
+			# Read output character by character (or chunk by chunk)
+			while True:
+				char = process.stdout.read(1)
+				if not char and process.poll() is not None:
+					break
+				if char:
+					full_text.append(char)
+					if onToken:
+						onToken(char)
+			
+			res_text = "".join(full_text).strip()
+			if process.returncode != 0:
+				log.error(f"miniqwen-cli failed with exit code {process.returncode}")
+				# If we have text, it might be the error message
+				if res_text:
+					raise Exception(f"CLI error: {res_text}")
+				raise Exception(f"CLI error with exit code {process.returncode}")
 			return res_text
-		except subprocess.CalledProcessError as e:
-			log.error(f"miniqwen-cli failed with exit code {e.returncode}: {e.output}")
-			raise Exception(f"CLI error: {e.output}")
 		except Exception as e:
 			log.exception("Error running miniqwen-cli")
 			raise
