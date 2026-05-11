@@ -8,6 +8,7 @@ import os
 import subprocess
 import tempfile
 import io
+from typing import Callable
 from PIL import Image
 from logHandler import log
 from .base import ImageCaptioner
@@ -57,11 +58,13 @@ class QwenImageCaptioner(ImageCaptioner):
 		self,
 		image: str | bytes,
 		maxLength: int | None = None,
+		onToken: Callable[[str], None] | None = None,
 	) -> str:
 		"""Generate image caption using CLI.
 
 		:param image: Image file path or binary data.
 		:param maxLength: Optional maximum tokens.
+		:param onToken: Optional callback for each generated token.
 		"""
 		temp_file_path = None
 		image_path = None
@@ -130,7 +133,10 @@ class QwenImageCaptioner(ImageCaptioner):
 				encoding="utf-8",
 				startupinfo=startupinfo,
 			)
-			return result.strip()
+			res_text = result.strip()
+			if onToken and res_text:
+				onToken(res_text)
+			return res_text
 		except subprocess.CalledProcessError as e:
 			log.error(f"miniqwen-cli failed with exit code {e.returncode}: {e.output}")
 			raise Exception(f"CLI error: {e.output}")

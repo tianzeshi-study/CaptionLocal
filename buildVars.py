@@ -25,7 +25,7 @@ addon_info = {
 	# Translators: Long description to be shown for this add-on on add-on information from add-ons manager
 	"addon_description" : _("generate caption  for image using local AI models, Describe the image objects browsed by NVDA, support shortcut key recognition. "),
 	# version
-	"addon_version" : "0.2.1",
+	"addon_version" : "0.3.0",
 	# Author(s)
 	"addon_author" : "tianze <tianzeshi_study@outlook.com>",
 	# URL for the add-on documentation support
@@ -35,7 +35,7 @@ addon_info = {
 	# Documentation file name
 	"addon_docFileName": "readme.html",
 	# Minimum NVDA version supported (e.g. "2018.3.0", minor version is optional)
-	"addon_minimumNVDAVersion" : "2023.1",
+	"addon_minimumNVDAVersion" : "2026.1.0",
 	# Last NVDA version supported/tested (e.g. "2018.4.0", ideally more recent than minimum version)
 	"addon_lastTestedNVDAVersion" : "2026.1.0",
 	# Add-on update channel (default is None, denoting stable releases,
