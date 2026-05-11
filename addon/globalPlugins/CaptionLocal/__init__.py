@@ -46,7 +46,8 @@ _modelsDir = os.path.abspath(os.path.join(_here, "..", "..", "models"))
 CONFSPEC = {
 	"modelsDir": f"string(default={_modelsDir})",
 	"currentModel": "string(default=Xenova/vit-gpt2-image-captioning)",
-	"loadModelWhenInit": "boolean(default=true)"
+	"loadModelWhenInit": "boolean(default=true)",
+	"copyToClipboard": "boolean(default=false)"
 }
 
 config.conf.spec['captionLocal'] = CONFSPEC

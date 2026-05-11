@@ -82,6 +82,9 @@ class AdvancedSettingsDialog(wx.Dialog):
 		self.useMirrorCb = wx.CheckBox(modelPanel, label=_("Use Mirror (hf-mirror.com)"))
 		self.useMirrorCb.SetValue(self.useMirror)
 		modelSizer.Add(self.useMirrorCb, 0, wx.ALL, 5)
+
+		self.updateConfigBtn = wx.Button(modelPanel, label=_("Update Models List"))
+		modelSizer.Add(self.updateConfigBtn, 0, wx.ALL, 5)
 		
 		modelPanel.SetSizer(modelSizer)
 		notebook.AddPage(modelPanel, _("Model Config"))
@@ -113,7 +116,36 @@ class AdvancedSettingsDialog(wx.Dialog):
 	def _bindEvents(self):
 		self.addFileBtn.Bind(wx.EVT_BUTTON, self.onAddFile)
 		self.removeFileBtn.Bind(wx.EVT_BUTTON, self.onRemoveFile)
-		
+		self.updateConfigBtn.Bind(wx.EVT_BUTTON, self.onUpdateConfig)
+
+	def onUpdateConfig(self, event):
+		self.updateConfigBtn.Disable()
+		threading.Thread(target=self._updateConfigWorker, daemon=True).start()
+
+	def _updateConfigWorker(self):
+		try:
+			req = urllib.request.Request(MODELS_CONFIG_URL, headers={'User-Agent': 'Mozilla/5.0'})
+			with urllib.request.urlopen(req, timeout=10) as response:
+				data = json.loads(response.read().decode('utf-8'))
+				if "models" in data:
+					with open(MODELS_CONFIG_FILE, "w", encoding="utf-8") as f:
+						json.dump(data, f, indent='\t', ensure_ascii=False)
+					wx.CallAfter(self._updateConfigSuccess, data["models"])
+				else:
+					wx.CallAfter(self._updateConfigFail, _("Invalid configuration format."))
+		except Exception as e:
+			wx.CallAfter(self._updateConfigFail, str(e))
+
+	def _updateConfigSuccess(self, models):
+		self.updateConfigBtn.Enable()
+		SoundNotification.playSuccess()
+		wx.MessageBox(_("Models list updated successfully."), _("Success"), wx.OK | wx.ICON_INFORMATION)
+
+	def _updateConfigFail(self, error):
+		self.updateConfigBtn.Enable()
+		SoundNotification.playError()
+		wx.MessageBox(_("Failed to update models list: {error}").format(error=error), _("Error"), wx.OK | wx.ICON_ERROR)
+
 	def onAddFile(self, event):
 		dlg = wx.TextEntryDialog(self, _("Enter file path:"), _("Add File"))
 		_bindEscapeToClose(dlg)
@@ -220,8 +252,6 @@ class ModelManagerFrame(wx.Frame):
 			self.modelCombo.SetSelection(0)
 		modelSizer.Add(self.modelCombo, 1, wx.ALL | wx.EXPAND, 5)
 		
-		self.updateConfigBtn = wx.Button(panel, label=_("Update Models List"))
-		modelSizer.Add(self.updateConfigBtn, 0, wx.ALL, 5)
 		modelBox.Add(modelSizer, 0, wx.ALL | wx.EXPAND, 5)
 		mainSizer.Add(modelBox, 0, wx.ALL | wx.EXPAND, 10)
 		
@@ -290,7 +320,6 @@ class ModelManagerFrame(wx.Frame):
 		self.setActiveBtn.Bind(wx.EVT_BUTTON, self.onSetActive)
 		self.downloadBtn.Bind(wx.EVT_BUTTON, self.onDownload)
 		self.modelCombo.Bind(wx.EVT_COMBOBOX, self.onModelSelect)
-		self.updateConfigBtn.Bind(wx.EVT_BUTTON, self.onUpdateConfig)
 		self.Bind(wx.EVT_CLOSE, self.onClose)
 		
 	def log(self, message: str):
@@ -326,6 +355,13 @@ class ModelManagerFrame(wx.Frame):
 			self.filesToDownload = settings['filesToDownload']
 			self.resolvePath = settings['resolvePath']
 			self.useMirror = settings['useMirror']
+			
+			# Reload local config in case it was updated
+			self._loadLocalConfig()
+			choices = [m.get("name", m.get("id", "Unknown")) for m in self.modelsConfig]
+			self.modelCombo.Clear()
+			self.modelCombo.AppendItems(choices)
+			
 			self.modelInfoText.SetLabel(_("Model: {modelName}").format(modelName=self.modelName))
 			self.filesInfoText.SetLabel(_("File Count: {count}").format(count=len(self.filesToDownload)))
 		dlg.Destroy()
@@ -337,11 +373,6 @@ class ModelManagerFrame(wx.Frame):
 			self.modelInfoText.SetLabel(_("Model: {modelName}").format(modelName=self.modelName))
 			self.filesInfoText.SetLabel(_("File Count: {count}").format(count=len(self.filesToDownload)))
 
-	def onUpdateConfig(self, event):
-		self.updateConfigBtn.Disable()
-		self.statusText.SetLabel(_("Updating models list..."))
-		threading.Thread(target=self._updateConfigWorker, daemon=True).start()
-		
 	def onSetActive(self, event):
 		import config
 		from logHandler import log
@@ -373,39 +404,6 @@ class ModelManagerFrame(wx.Frame):
 			log.error(f"Failed to set active model: {e}")
 			self.log(_("❌ Failed to set active model."))
 			SoundNotification.playError()
-
-	def _updateConfigWorker(self):
-		try:
-			req = urllib.request.Request(MODELS_CONFIG_URL, headers={'User-Agent': 'Mozilla/5.0'})
-			with urllib.request.urlopen(req, timeout=10) as response:
-				data = json.loads(response.read().decode('utf-8'))
-				if "models" in data:
-					with open(MODELS_CONFIG_FILE, "w", encoding="utf-8") as f:
-						json.dump(data, f, indent='\t', ensure_ascii=False)
-					wx.CallAfter(self._updateConfigSuccess, data["models"])
-				else:
-					wx.CallAfter(self._updateConfigFail, _("Invalid configuration format."))
-		except Exception as e:
-			wx.CallAfter(self._updateConfigFail, str(e))
-			
-	def _updateConfigSuccess(self, models):
-		self.modelsConfig = models
-		choices = [m.get("name", m.get("id", "Unknown")) for m in self.modelsConfig]
-		self.modelCombo.Clear()
-		self.modelCombo.AppendItems(choices)
-		if choices:
-			self.modelCombo.SetSelection(0)
-			self._applyModelConfig(self.modelsConfig[0])
-			self.modelInfoText.SetLabel(_("Model: {modelName}").format(modelName=self.modelName))
-			self.filesInfoText.SetLabel(_("File Count: {count}").format(count=len(self.filesToDownload)))
-		self.statusText.SetLabel(_("Models list updated successfully."))
-		self.updateConfigBtn.Enable()
-		SoundNotification.playSuccess()
-
-	def _updateConfigFail(self, error):
-		self.statusText.SetLabel(_("Failed to update models list: {error}").format(error=error))
-		self.updateConfigBtn.Enable()
-		SoundNotification.playError()
 
 	def onDownload(self, event):
 		if self.downloadThread and self.downloadThread.is_alive():

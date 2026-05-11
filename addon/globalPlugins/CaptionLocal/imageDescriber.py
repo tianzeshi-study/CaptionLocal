@@ -129,8 +129,9 @@ class ImageDescriber(ContentRecognizer):
 				self._current_text = final_caption
 			self._update_result()
 			
-			# Copy to clipboard at the end
-			queueHandler.queueFunction(queueHandler.eventQueue, api.copyToClip, text=final_caption, notify=False)
+			# Copy to clipboard at the end if enabled
+			if config.conf['captionLocal'].get('copyToClipboard', False):
+				queueHandler.queueFunction(queueHandler.eventQueue, api.copyToClip, text=final_caption, notify=False)
 
 		except Exception as e:
 			log.exception("Failed to generate caption")
