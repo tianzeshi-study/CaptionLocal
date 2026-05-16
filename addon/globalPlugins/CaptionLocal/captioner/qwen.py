@@ -8,6 +8,7 @@ import os
 import subprocess
 import tempfile
 import io
+from typing import Callable
 from PIL import Image
 from logHandler import log
 from .base import ImageCaptioner
@@ -57,11 +58,13 @@ class QwenImageCaptioner(ImageCaptioner):
 		self,
 		image: str | bytes,
 		maxLength: int | None = None,
+		onToken: Callable[[str], None] | None = None,
 	) -> str:
 		"""Generate image caption using CLI.
 
 		:param image: Image file path or binary data.
 		:param maxLength: Optional maximum tokens.
+		:param onToken: Optional callback for each generated token.
 		"""
 		temp_file_path = None
 		image_path = None
@@ -123,17 +126,36 @@ class QwenImageCaptioner(ImageCaptioner):
 			startupinfo = subprocess.STARTUPINFO()
 			startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-			result = subprocess.check_output(
+			# Use Popen to allow streaming output
+			process = subprocess.Popen(
 				cmd,
+				stdout=subprocess.PIPE,
 				stderr=subprocess.STDOUT,
 				universal_newlines=True,
 				encoding="utf-8",
 				startupinfo=startupinfo,
+				bufsize=1, # Line buffered
 			)
-			return result.strip()
-		except subprocess.CalledProcessError as e:
-			log.error(f"miniqwen-cli failed with exit code {e.returncode}: {e.output}")
-			raise Exception(f"CLI error: {e.output}")
+
+			full_text = []
+			# Read output character by character (or chunk by chunk)
+			while True:
+				char = process.stdout.read(1)
+				if not char and process.poll() is not None:
+					break
+				if char:
+					full_text.append(char)
+					if onToken:
+						onToken(char)
+			
+			res_text = "".join(full_text).strip()
+			if process.returncode != 0:
+				log.error(f"miniqwen-cli failed with exit code {process.returncode}")
+				# If we have text, it might be the error message
+				if res_text:
+					raise Exception(f"CLI error: {res_text}")
+				raise Exception(f"CLI error with exit code {process.returncode}")
+			return res_text
 		except Exception as e:
 			log.exception("Error running miniqwen-cli")
 			raise

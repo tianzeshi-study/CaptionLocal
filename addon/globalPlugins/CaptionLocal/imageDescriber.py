@@ -14,13 +14,16 @@ import io
 import threading
 from threading import Thread
 import os
+import ctypes
 
 import wx
 import config
 from logHandler import log
 import ui
 import api
+import queueHandler
 
+from contentRecog import ContentRecognizer, SimpleTextResult, RecogImageInfo
 from .captioner import ImageCaptioner
 from .captioner import imageCaptionerFactory
 
@@ -30,74 +33,25 @@ try:
 except:
 	pass
 
-def _screenshotNavigator() -> bytes:
-	"""Capture a screenshot of the current navigator object.
 
-	:Return: The captured image data as bytes in JPEG format.
-	"""
-	# Get the currently focused object on screen
-	obj = api.getNavigatorObject()
-
-	# Get the object's position and size information
-	x, y, width, height = obj.location
-
-	# Create a bitmap with the same size as the object
-	bmp = wx.Bitmap(width, height)
-
-	# Create a memory device context for drawing operations on the bitmap
-	mem = wx.MemoryDC(bmp)
-
-	# Copy the specified screen region to the memory bitmap
-	mem.Blit(0, 0, width, height, wx.ScreenDC(), x, y)
-
-	# Convert the bitmap to an image object for more flexible operations
-	image = bmp.ConvertToImage()
-
-	# Create a byte stream object to save image data as binary data
-	body = io.BytesIO()
-
-	# Save the image to the byte stream in JPEG format
-	image.SaveFile(body, wx.BITMAP_TYPE_JPEG)
-
-	# Read the binary image data from the byte stream
-	imageData = body.getvalue()
-	return imageData
-
-
-def _messageCaption(captioner: ImageCaptioner, imageData: bytes) -> None:
-	"""Generate a caption for the given image data.
-
-	:param captioner: The captioner instance to use for generation.
-	:param imageData: The image data to caption.
-	"""
-	try:
-		description = captioner.generateCaption(image=imageData)
-	except Exception:
-		# Translators: error message when an image description cannot be generated
-		wx.CallAfter(ui.message, _("Failed to generate description"))
-		log.exception("Failed to generate caption")
-	else:
-		wx.CallAfter(
-			ui.message,
-			# Translators: Presented when an AI image description has been generated.
-			# {description} will be replaced with the generated image description.
-			_("Could be: {description}").format(description=description),
-		)
-		wx.CallAfter(api.copyToClip(text=description, notify=False))
-
-
-class ImageDescriber:
+class ImageDescriber(ContentRecognizer):
 	"""module for local image caption functionality.
 
 	This module provides image captioning using local ONNX models.
 	It can capture screen regions and generate descriptive captions.
 	"""
 
+	# Translators: Name of the content recognizer
+	name = _("Local Image Caption")
+
 	def __init__(self) -> None:
+		super().__init__()
 		self.isModelLoaded = False
 		self.captioner: ImageCaptioner | None = None
 		self.captionThread: Thread | None = None
 		self.loadModelThread: Thread | None = None
+		self._current_text = ""
+		self._onResult_callback = None
 
 		enable = config.conf["captionLocal"]["loadModelWhenInit"]
 		# Load model when initializing
@@ -107,40 +61,108 @@ class ImageDescriber:
 	def terminate(self):
 		for t in [self.captionThread, self.loadModelThread]:
 			if t is not None and t.is_alive():
-				# We can't really join here if we are on the main thread and it might block
-				# but for an addon terminate it should be fine if it's not too long
 				pass
 		self.captioner = None
 
-	def runCaption(self, gesture=None) -> None:
-		"""Script to run image captioning on the current navigator object.
+	def getResizeFactor(self, width, height):
+		if width < 100 or height < 100:
+			return 4
+		return 1
 
-		:param gesture: The input gesture that triggered this script.
+	def recognize(self, pixels: ctypes.Array, imageInfo: RecogImageInfo, onResult):
+		"""Asynchronously recognize content from an image.
+		
+		@param pixels: The pixels of the image as a two dimensional array of RGBQUADs.
+		@param imageInfo: Information about the image for recognition.
+		@param onResult: A callable which takes a RecognitionResult (or an exception on failure).
 		"""
-		self._doCaption()
-
-	def _doCaption(self) -> None:
-		"""Real logic to run image captioning on the current navigator object."""
-		imageData = _screenshotNavigator()
-
 		if not self.isModelLoaded:
-			# In the addon, we might want to just load it or show a message
+			# If model is not loaded, we might need to load it.
+			# But in contentRecog context, we should probably fail or message.
 			ui.message(_("loading model..."))
 			self._loadModel()
 			if not self.isModelLoaded:
+				onResult(Exception(_("Model not loaded")))
 				return
 
 		if self.captionThread is not None and self.captionThread.is_alive():
+			# Already running? contentRecog usually handles one at a time.
 			return
 
+		self._onResult_callback = onResult
+		self._current_text = ""
+
 		self.captionThread = threading.Thread(
-			target=_messageCaption,
-			args=(self.captioner, imageData),
+			target=self._do_recognize,
+			args=(pixels, imageInfo),
 			name="RunCaptionThread",
 		)
-		# Translators: Message when starting image recognition
-		ui.message(_("getting image description..."))
 		self.captionThread.start()
+
+	def _do_recognize(self, pixels, imageInfo):
+		from PIL import Image
+		
+		width = imageInfo.recogWidth
+		height = imageInfo.recogHeight
+		
+		try:
+			# Convert pixels (BGRA8) to Image
+			# pixels is ctypes.Array of RGBQUAD (BGRA)
+			# PIL "RGBX" handles 4-byte pixels, "BGRX" is what we want for BGRA if we ignore A
+			image = Image.frombytes("RGBX", (width, height), pixels, "raw", "BGRX")
+			image = image.convert("RGB")
+			
+			buffer = io.BytesIO()
+			image.save(buffer, format="JPEG")
+			imageData = buffer.getvalue()
+
+			def on_token(token):
+				self._current_text += token
+				self._update_result()
+
+			final_caption = self.captioner.generateCaption(
+				image=imageData,
+				onToken=on_token
+			)
+			# Final update to ensure UI is shown and text is correct
+			if final_caption and not self._current_text:
+				self._current_text = final_caption
+			self._update_result()
+			
+			# Copy to clipboard at the end if enabled
+			if config.conf['captionLocal'].get('copyToClipboard', False):
+				queueHandler.queueFunction(queueHandler.eventQueue, api.copyToClip, text=final_caption, notify=False)
+
+		except Exception as e:
+			log.exception("Failed to generate caption")
+			if self._onResult_callback:
+				self._onResult_callback(e)
+
+	def _update_result(self):
+		if not self._onResult_callback:
+			return
+
+		result = SimpleTextResult(self._current_text)
+		
+		# If this is a RefreshableRecogResultNVDAObject, we can use its _onResult for updates
+		onResult = self._onResult_callback
+		ui_obj = getattr(onResult, "__self__", None)
+		
+		if ui_obj and hasattr(ui_obj, "result") and ui_obj.result is not None:
+			# Subsequent update
+			if hasattr(ui_obj, "_onResult"):
+				queueHandler.queueFunction(queueHandler.eventQueue, ui_obj._onResult, result)
+			else:
+				queueHandler.queueFunction(queueHandler.eventQueue, onResult, result)
+		elif self._current_text:
+			# First result (or not a refreshable object)
+			# Only show UI if we have text
+			queueHandler.queueFunction(queueHandler.eventQueue, onResult, result)
+
+	def cancel(self):
+		"""Cancel the recognition in progress."""
+		# For now, we don't have a good way to kill the thread/onnx inference safely.
+		self._onResult_callback = None
 
 	def _loadModel(self, localModelDirPath: str | None = None) -> None:
 		"""Load the ONNX model for image captioning.
@@ -167,16 +189,13 @@ class ImageDescriber:
 			)
 		except FileNotFoundError:
 			self.isModelLoaded = False
-			# In the addon, we can use the ModelManager to download
 			ui.message(_("Model not found. Please use Model Manager to download."))
 		except Exception:
 			self.isModelLoaded = False
-			# Translators: error message when fail to load model
 			wx.CallAfter(ui.message, _("failed to load image captioner"))
 			log.exception("Failed to load image captioner model")
 		else:
 			self.isModelLoaded = True
-			# Translators: Message when successfully load the model
 			wx.CallAfter(ui.message, _("image captioning on"))
 
 	def loadModelInBackground(self, localModelDirPath: str | None = None) -> None:
@@ -195,7 +214,6 @@ class ImageDescriber:
 		if hasattr(self, "captioner") and self.captioner:
 			del self.captioner
 			self.captioner = None
-			# Translators: Message when image captioning terminates
 			ui.message(_("image captioning off"))
 			self.isModelLoaded = False
 
