@@ -38,7 +38,7 @@ jobs:
       - name: building addon
         run: |
           $REF_NAME = "${{ github.ref_name }}".Replace('/', '-')
-          scons version="${REF_NAME}-${{ matrix.python-version }}-${{ matrix.architecture }}"
+          scons version="${REF_NAME}"
         shell: pwsh
       - uses: actions/upload-artifact@v4
         with:
