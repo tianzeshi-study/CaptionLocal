@@ -237,10 +237,11 @@ class VitGpt2ImageCaptioner(ImageCaptioner):
 		# Return last hidden state
 		return encoderOutputs[0]
 
-	def _decodeTokens(self, tokenIds: list[int]) -> str:
+	def _decodeTokens(self, tokenIds: list[int], strip: bool = True) -> str:
 		"""Decode token IDs to text.
 
 		:param tokenIds: List of token IDs.
+		:param strip: Whether to strip leading/trailing whitespace and merge multiple spaces.
 		:return: Decoded text string.
 		"""
 		tokens = []
@@ -255,8 +256,9 @@ class VitGpt2ImageCaptioner(ImageCaptioner):
 		text = " ".join(tokens).replace("Ġ", " ")
 
 		# Basic text cleaning
-		text = re.sub(r"\s+", " ", text)  # Merge multiple spaces
-		text = text.strip()
+		if strip:
+			text = re.sub(r"\s+", " ", text)  # Merge multiple spaces
+			text = text.strip()
 
 		return text
 
@@ -347,7 +349,7 @@ class VitGpt2ImageCaptioner(ImageCaptioner):
 			
 			if onToken:
 				# Decode only the last token
-				token_text = self._decodeTokens([nextTokenId])
+				token_text = self._decodeTokens([nextTokenId], strip=False)
 				if token_text:
 					onToken(token_text)
 
