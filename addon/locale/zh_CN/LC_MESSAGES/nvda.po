@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: 'nvda-translations@groups.io'\n"
-"POT-Creation-Date: 2026-04-18 17:06+0800\n"
+"POT-Creation-Date: 2026-05-11 20:21+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,69 +17,64 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: addon\globalPlugins\CaptionLocal\__init__.py:76
+#: addon\globalPlugins\CaptionLocal\modelManager.py:206
+msgid "Model Manager"
+msgstr "模型管理器"
+
 #. Translators: Description for the image caption script
-#: addon\globalPlugins\CaptionLocal\__init__.py:87
+#: addon\globalPlugins\CaptionLocal\__init__.py:93
 msgid "image caption using local model"
 msgstr "使用本地模型进行图像描述"
 
 #. Translators: Category of addon in input gestures.
-#: addon\globalPlugins\CaptionLocal\__init__.py:89
-#: addon\globalPlugins\CaptionLocal\__init__.py:100
-#: addon\globalPlugins\CaptionLocal\__init__.py:111
+#: addon\globalPlugins\CaptionLocal\__init__.py:95
+#: addon\globalPlugins\CaptionLocal\__init__.py:106
+#: addon\globalPlugins\CaptionLocal\__init__.py:117
 msgid "Caption Local"
 msgstr "本地图像描述"
 
 #. Translators: Description for the release model script
-#: addon\globalPlugins\CaptionLocal\__init__.py:98
+#: addon\globalPlugins\CaptionLocal\__init__.py:104
 #, fuzzy
 msgid "toggle local model"
 msgstr "释放本地模型"
 
 #. Translators: Description for the open model manager script
-#: addon\globalPlugins\CaptionLocal\__init__.py:109
+#: addon\globalPlugins\CaptionLocal\__init__.py:115
 msgid "open model manager"
 msgstr "打开模型管理器"
 
-#. Translators: error message when an image description cannot be generated
-#: addon\globalPlugins\CaptionLocal\imageDescriber.py:77
-msgid "Failed to generate description"
-msgstr "生成描述失败"
+#. Translators: Name of the content recognizer
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:45
+msgid "Local Image Caption"
+msgstr ""
 
-#. Translators: Presented when an AI image description has been generated.
-#. {description} will be replaced with the generated image description.
-#: addon\globalPlugins\CaptionLocal\imageDescriber.py:84
-#, python-brace-format
-msgid "Could be: {description}"
-msgstr "可能是: {description}"
-
-#. In the addon, we might want to just load it or show a message
-#: addon\globalPlugins\CaptionLocal\imageDescriber.py:128
+#. If model is not loaded, we might need to load it.
+#. But in contentRecog context, we should probably fail or message.
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:82
 msgid "loading model..."
 msgstr "正在加载模型..."
 
-#. Translators: Message when starting image recognition
-#: addon\globalPlugins\CaptionLocal\imageDescriber.py:142
-msgid "getting image description..."
-msgstr "正在获取图像描述"
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:85
+#, fuzzy
+msgid "Model not loaded"
+msgstr "模型下载管理器"
 
-#. In the addon, we can use the ModelManager to download
-#: addon\globalPlugins\CaptionLocal\imageDescriber.py:171
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:192
 msgid "Model not found. Please use Model Manager to download."
 msgstr "模型未找到，请使用模型管理器下载"
 
-#. Translators: error message when fail to load model
-#: addon\globalPlugins\CaptionLocal\imageDescriber.py:175
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:195
 msgid "failed to load image captioner"
 msgstr "加载失败"
 
-#. Translators: Message when successfully load the model
-#: addon\globalPlugins\CaptionLocal\imageDescriber.py:180
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:199
 #, fuzzy
 msgid "image captioning on"
 msgstr "使用本地模型进行图像描述"
 
-#. Translators: Message when image captioning terminates
-#: addon\globalPlugins\CaptionLocal\imageDescriber.py:199
+#: addon\globalPlugins\CaptionLocal\imageDescriber.py:217
 #, fuzzy
 msgid "image captioning off"
 msgstr "使用本地模型进行图像描述"
@@ -100,194 +95,186 @@ msgstr "解析路径:"
 msgid "Use Mirror (hf-mirror.com)"
 msgstr "使用镜像(hf-mirror.com)"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:87
-msgid "Model Config"
-msgstr "模型设置"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:91
-msgid "Files to Download:"
-msgstr "需要下载的文件:"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:98
-#: addon\globalPlugins\CaptionLocal\modelManager.py:118
-msgid "Add File"
-msgstr "添加文件"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:99
-msgid "Remove File"
-msgstr "移除文件"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:105
-msgid "File List"
-msgstr "文件列表"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:118
-msgid "Enter file path:"
-msgstr "输入文件路径:"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:174
-msgid "Model Manager"
-msgstr "模型管理器"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:206
-msgid "Model Download Manager"
-msgstr "模型下载管理器"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:213
-#, fuzzy
-msgid "Model Selection"
-msgstr "模型信息"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:215
-msgid "Select Model:"
-msgstr "选择模型"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:223
+#: addon\globalPlugins\CaptionLocal\modelManager.py:86
 msgid "Update Models List"
 msgstr "更新模型列表"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:228
-msgid "Model Directory Settings"
-msgstr "模型目录设置"
+#: addon\globalPlugins\CaptionLocal\modelManager.py:90
+msgid "Model Config"
+msgstr "模型设置"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:230
-#, fuzzy
-msgid "Models Directory:"
-msgstr "选择目录"
+#: addon\globalPlugins\CaptionLocal\modelManager.py:94
+msgid "Files to Download:"
+msgstr "需要下载的文件:"
 
-#. Translators: The label of a button to browse for a directory or a file.
-#: addon\globalPlugins\CaptionLocal\modelManager.py:233
-#: addon\globalPlugins\CaptionLocal\panel.py:64
-msgid "Browse..."
-msgstr "浏览"
+#: addon\globalPlugins\CaptionLocal\modelManager.py:101
+#: addon\globalPlugins\CaptionLocal\modelManager.py:150
+msgid "Add File"
+msgstr "添加文件"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:238
-msgid "Model Information"
-msgstr "模型信息"
+#: addon\globalPlugins\CaptionLocal\modelManager.py:102
+msgid "Remove File"
+msgstr "移除文件"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:239
-#: addon\globalPlugins\CaptionLocal\modelManager.py:329
-#: addon\globalPlugins\CaptionLocal\modelManager.py:337
-#: addon\globalPlugins\CaptionLocal\modelManager.py:380
-#, python-brace-format
-msgid "Model: {modelName}"
-msgstr "模型: {modelName}"
+#: addon\globalPlugins\CaptionLocal\modelManager.py:108
+msgid "File List"
+msgstr "文件列表"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:241
-#: addon\globalPlugins\CaptionLocal\modelManager.py:330
-#: addon\globalPlugins\CaptionLocal\modelManager.py:338
-#: addon\globalPlugins\CaptionLocal\modelManager.py:381
-#, python-brace-format
-msgid "File Count: {count}"
-msgstr "文件数量: {count}"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:246
-msgid "Advanced Settings..."
-msgstr "高级设置..."
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:247
-msgid "Set as Active Model"
-msgstr "激活该模型"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:251
-#: addon\globalPlugins\CaptionLocal\modelManager.py:443
-msgid "Start Download"
-msgstr "开始下载"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:255
-msgid "Ready"
-msgstr "准备就绪"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:258
-msgid "Download Log"
-msgstr "下载日志"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:312
-#, python-brace-format
-msgid "file: {fileName}  progress: {progress:.2f}%"
-msgstr "文件: {fileName}  进度: {progress:.2f}%"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:315
-msgid "Select Download Directory"
-msgstr "选择下载目录"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:342
-#, fuzzy
-msgid "Updating models list..."
-msgstr "正在加载模型..."
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:351
-#, fuzzy, python-brace-format
-msgid "✅ Active model set to: {modelName}"
-msgstr "模型: {modelName}"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:355
-msgid "❌ Failed to set active model."
-msgstr "激活模型失败"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:368
+#: addon\globalPlugins\CaptionLocal\modelManager.py:135
 msgid "Invalid configuration format."
 msgstr "无效的设置格式"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:382
+#: addon\globalPlugins\CaptionLocal\modelManager.py:142
 msgid "Models list updated successfully."
 msgstr "模型列表更新成功"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:387
+#: addon\globalPlugins\CaptionLocal\modelManager.py:142
+msgid "Success"
+msgstr ""
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:147
 #, fuzzy, python-brace-format
 msgid "Failed to update models list: {error}"
 msgstr "初始化路径失败: {error}"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:395
+#: addon\globalPlugins\CaptionLocal\modelManager.py:147
+#: addon\globalPlugins\CaptionLocal\modelManager.py:454
+msgid "Error"
+msgstr "错误"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:150
+msgid "Enter file path:"
+msgstr "输入文件路径:"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:238
+msgid "Model Download Manager"
+msgstr "模型下载管理器"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:245
+#, fuzzy
+msgid "Model Selection"
+msgstr "模型信息"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:247
+msgid "Select Model:"
+msgstr "选择模型"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:258
+msgid "Model Directory Settings"
+msgstr "模型目录设置"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:260
+#, fuzzy
+msgid "Models Directory:"
+msgstr "选择目录"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:263
+msgid "Browse..."
+msgstr "浏览"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:268
+msgid "Model Information"
+msgstr "模型信息"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:269
+#: addon\globalPlugins\CaptionLocal\modelManager.py:365
+#: addon\globalPlugins\CaptionLocal\modelManager.py:373
+#, python-brace-format
+msgid "Model: {modelName}"
+msgstr "模型: {modelName}"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:271
+#: addon\globalPlugins\CaptionLocal\modelManager.py:366
+#: addon\globalPlugins\CaptionLocal\modelManager.py:374
+#, python-brace-format
+msgid "File Count: {count}"
+msgstr "文件数量: {count}"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:276
+msgid "Advanced Settings..."
+msgstr "高级设置..."
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:277
+msgid "Set as Active Model"
+msgstr "激活该模型"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:281
+#: addon\globalPlugins\CaptionLocal\modelManager.py:460
+msgid "Start Download"
+msgstr "开始下载"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:285
+msgid "Ready"
+msgstr "准备就绪"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:288
+msgid "Download Log"
+msgstr "下载日志"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:341
+#, python-brace-format
+msgid "file: {fileName}  progress: {progress:.2f}%"
+msgstr "文件: {fileName}  进度: {progress:.2f}%"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:344
+msgid "Select Download Directory"
+msgstr "选择下载目录"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:401
+#, fuzzy, python-brace-format
+msgid "✅ Active model set to: {modelName}"
+msgstr "模型: {modelName}"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:405
+msgid "❌ Failed to set active model."
+msgstr "激活模型失败"
+
+#: addon\globalPlugins\CaptionLocal\modelManager.py:412
 #, fuzzy
 msgid "Cancelling download..."
 msgstr "开始模型文件下载..."
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:398
+#: addon\globalPlugins\CaptionLocal\modelManager.py:415
 #, fuzzy
 msgid "Cancel Download"
 msgstr "开始下载"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:406
+#: addon\globalPlugins\CaptionLocal\modelManager.py:423
 msgid "Downloading..."
 msgstr "正在下载..."
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:421
+#: addon\globalPlugins\CaptionLocal\modelManager.py:438
 #, fuzzy
 msgid "Download cancelled."
 msgstr "下载失败"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:422
+#: addon\globalPlugins\CaptionLocal\modelManager.py:439
 #, fuzzy
 msgid "Cancelled"
 msgstr "取消"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:424
+#: addon\globalPlugins\CaptionLocal\modelManager.py:441
 #, fuzzy
 msgid "✅ All files downloaded successfully!"
 msgstr "✅ 所有文件下载成功! ({success}/{total})"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:425
+#: addon\globalPlugins\CaptionLocal\modelManager.py:442
 msgid "Completed"
 msgstr "已完成"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:432
+#: addon\globalPlugins\CaptionLocal\modelManager.py:449
 #, fuzzy
 msgid "❌ Download failed for some files."
 msgstr "下载失败"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:433
+#: addon\globalPlugins\CaptionLocal\modelManager.py:450
 msgid "Failed"
 msgstr "失败"
 
-#: addon\globalPlugins\CaptionLocal\modelManager.py:436
+#: addon\globalPlugins\CaptionLocal\modelManager.py:453
 #, fuzzy, python-brace-format
 msgid "Error: {error}"
 msgstr "下载过程中出现错误: {error}"
-
-#: addon\globalPlugins\CaptionLocal\modelManager.py:437
-msgid "Error"
-msgstr "错误"
 
 #: addon\globalPlugins\CaptionLocal\panel.py:37
 #, python-brace-format
@@ -298,24 +285,18 @@ msgstr ""
 " 附加组件只能从普通配置文件中进行配置。请关闭此对话框，将您的配置文件设置为默"
 "认情况，然后重试。"
 
-#. Translators: This is a label for an edit field in the CaptionLocal Settings panel.
-#: addon\globalPlugins\CaptionLocal\panel.py:57
-#, fuzzy
-msgid "models directory"
-msgstr "选择目录"
-
-#. Translators: The title of the dialog presented when browsing for the directory.
-#: addon\globalPlugins\CaptionLocal\panel.py:66
-msgid "Select a directory"
-msgstr "选择目录"
-
 #. Translators: A setting in addon settings dialog.
-#: addon\globalPlugins\CaptionLocal\panel.py:74
+#: addon\globalPlugins\CaptionLocal\panel.py:57
 msgid "load model when init (may cause high use of memory)"
 msgstr "初始化时加载模型（但可能导致内存大量使用）"
 
+#. Translators: A setting in addon settings dialog.
+#: addon\globalPlugins\CaptionLocal\panel.py:61
+msgid "Copy result to clipboard automatically"
+msgstr "自动将结果复制到剪贴板"
+
 #. Translators: default prompt for image captioning
-#: addon\globalPlugins\CaptionLocal\captioner\qwen.py:26
+#: addon\globalPlugins\CaptionLocal\captioner\qwen.py:29
 msgid "Please describe the picture in one sentence"
 msgstr "请一句话描述图片"
 
@@ -334,6 +315,27 @@ msgid ""
 "generate caption  for image using local AI models, Describe the image "
 "objects browsed by NVDA, support shortcut key recognition. "
 msgstr ""
+
+#~ msgid "Failed to generate description"
+#~ msgstr "生成描述失败"
+
+#, python-brace-format
+#~ msgid "Could be: {description}"
+#~ msgstr "可能是: {description}"
+
+#~ msgid "getting image description..."
+#~ msgstr "正在获取图像描述"
+
+#, fuzzy
+#~ msgid "Updating models list..."
+#~ msgstr "正在加载模型..."
+
+#, fuzzy
+#~ msgid "models directory"
+#~ msgstr "选择目录"
+
+#~ msgid "Select a directory"
+#~ msgstr "选择目录"
 
 #~ msgid "model path"
 #~ msgstr "模型路径"

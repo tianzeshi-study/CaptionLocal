@@ -21,6 +21,7 @@ import globalVars
 import config
 import scriptHandler
 import globalPluginHandler
+from contentRecog import recogUi
 
 # Add libs directory to path
 _here = os.path.dirname(__file__)
@@ -45,7 +46,8 @@ _modelsDir = os.path.abspath(os.path.join(_here, "..", "..", "models"))
 CONFSPEC = {
 	"modelsDir": f"string(default={_modelsDir})",
 	"currentModel": "string(default=Xenova/vit-gpt2-image-captioning)",
-	"loadModelWhenInit": "boolean(default=true)"
+	"loadModelWhenInit": "boolean(default=true)",
+	"copyToClipboard": "boolean(default=false)"
 }
 
 config.conf.spec['captionLocal'] = CONFSPEC
@@ -95,7 +97,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	)
 	def script_runCaption(self, gesture) -> None:
 		"""Script to run image captioning on the current navigator object."""
-		self.imageDescriber.runCaption(gesture)
+		recogUi.recognizeNavigatorObject(self.imageDescriber)
 
 	@scriptHandler.script(
 		# Translators: Description for the release model script

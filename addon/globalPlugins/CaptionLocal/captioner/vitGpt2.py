@@ -9,6 +9,7 @@ import json
 import re
 import io
 from functools import lru_cache
+from typing import Callable
 
 import numpy as np
 from PIL import Image
@@ -299,12 +300,14 @@ class VitGpt2ImageCaptioner(ImageCaptioner):
 		self,
 		encoderHiddenStates: np.ndarray,
 		maxLength: int | None = None,
+		onToken: Callable[[str], None] | None = None,
 	) -> str:
 		"""Generate text using greedy search.
 
 
 		:param encoderHiddenStates: Encoder hidden states.
 		:param maxLength: Maximum generation length.
+		:param onToken: Optional callback for each generated token.
 		:return: Generated text string.
 		"""
 		if maxLength is None:
@@ -341,6 +344,12 @@ class VitGpt2ImageCaptioner(ImageCaptioner):
 				break
 
 			generatedTokens.append(nextTokenId)
+			
+			if onToken:
+				# Decode only the last token
+				token_text = self._decodeTokens([nextTokenId])
+				if token_text:
+					onToken(token_text)
 
 			# Update past_key_values from outputs
 			if len(decoderOutputs) > 1:
@@ -364,11 +373,13 @@ class VitGpt2ImageCaptioner(ImageCaptioner):
 		self,
 		image: str | bytes,
 		maxLength: int | None = None,
+		onToken: Callable[[str], None] | None = None,
 	) -> str:
 		"""Generate image caption.
 
 		:param image: Image file path or binary data.
 		:param maxLength: Maximum generation length.
+		:param onToken: Optional callback for each generated token.
 		:return: Generated image caption.
 		"""
 		# Preprocess image
@@ -378,6 +389,6 @@ class VitGpt2ImageCaptioner(ImageCaptioner):
 		encoderHiddenStates = self._encodeImage(imageArray)
 
 		# Generate text
-		caption = self._generateWithGreedy(encoderHiddenStates, maxLength)
+		caption = self._generateWithGreedy(encoderHiddenStates, maxLength, onToken=onToken)
 
 		return caption

@@ -14,8 +14,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: "3.11"
-            architecture: "x86"
           - python-version: "3.13"
             architecture: "x64"
     steps:
@@ -30,20 +28,17 @@ jobs:
         run: |
           pip install --upgrade pip wheel
           pip install -r requirements.txt
-          if ("${{ matrix.python-version }}" -eq "3.11") {
-            pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs --platform win32 --only-binary=:all: --no-binary=:none:
-            pip install miniqinference[cli]==0.1.2 --target ./addon/globalPlugins/CaptionLocal/libs --upgrade --platform win_amd64 --only-binary=:all: --no-binary=:none: 
-          } else {
-            pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs 
-            pip install miniqinference[cli]==0.1.2 --target ./addon/globalPlugins/CaptionLocal/libs --upgrade --platform win_amd64 --only-binary=:all: --no-binary=:none: 
-          }
+          pip install -r requirements-libs.txt --target ./addon/globalPlugins/CaptionLocal/libs --platform win_amd64 --only-binary=:all: --no-binary=:none:
+          pip install miniqinference[cli]==0.1.2 --target ./addon/globalPlugins/CaptionLocal/libs --upgrade --platform win_amd64 --only-binary=:all: --no-binary=:none: 
           
       - name: Code checks
         run: |
           $env:SKIP="no-commit-to-branch"
           pre-commit run --all
       - name: building addon
-        run: scons version="${{ github.ref_name }}-${{ matrix.python-version }}-${{ matrix.architecture }}"
+        run: |
+          $REF_NAME = "${{ github.ref_name }}".Replace('/', '-')
+          scons version="${REF_NAME}-${{ matrix.python-version }}-${{ matrix.architecture }}"
         shell: pwsh
       - uses: actions/upload-artifact@v4
         with:

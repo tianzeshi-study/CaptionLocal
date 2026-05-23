@@ -53,43 +53,13 @@ class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
 		
 		sHelper = guiHelper.BoxSizerHelper(self, sizer=settingsSizer)
 		
-		# Translators: This is a label for an edit field in the CaptionLocal Settings panel.
-		modelPathLabel = _("models directory")
-
-		groupSizer = wx.StaticBoxSizer(wx.VERTICAL, self, label=modelPathLabel)
-		groupBox = groupSizer.GetStaticBox()
-		groupHelper = sHelper.addItem(gui.guiHelper.BoxSizerHelper(self, sizer=groupSizer))
-		
-		# Translators: The label of a button to browse for a directory or a file.
-		browseText = _("Browse...")
-		# Translators: The title of the dialog presented when browsing for the directory.
-		dirDialogTitle = _("Select a directory")
-		
-		directoryPathHelper = gui.guiHelper.PathSelectionHelper(groupBox, browseText, dirDialogTitle)
-		directoryEntryControl = groupHelper.addItem(directoryPathHelper)
-		self.modelPathEdit = directoryEntryControl.pathControl
-		self.modelPathEdit.Value = config.conf['captionLocal']['modelsDir']
-		
 		# Translators: A setting in addon settings dialog.
 		self.loadModelWhenInit = sHelper.addItem(wx.CheckBox(self, label=_("load model when init (may cause high use of memory)")))
 		self.loadModelWhenInit.SetValue(config.conf['captionLocal']['loadModelWhenInit'])
 
-	@staticmethod
-	def getParameterBound(name: str, boundType: str) -> Optional[int]:
-		"""Get the bound of a parameter in the "ndtt" section of the config.
-		
-		Args:
-			name: The name of the parameter.
-			boundType: Either "min" or "max".
-			
-		Returns:
-			The bound value if found, None otherwise.
-		"""
-		try:
-			return config.conf.getConfigValidation(("ndtt", name)).kwargs[boundType]
-		except TypeError:
-			# For older version of configObj (e.g. used in NVDA 2019.2.1)
-			return config.conf.getConfigValidationParameter(["ndtt", name], boundType)
+		# Translators: A setting in addon settings dialog.
+		self.copyToClipboard = sHelper.addItem(wx.CheckBox(self, label=_("Copy result to clipboard automatically")))
+		self.copyToClipboard.SetValue(config.conf['captionLocal'].get('copyToClipboard', False))
 
 	def onSave(self) -> None:
 		"""Save the configuration settings.
@@ -99,7 +69,7 @@ class CaptionLocalSettingsPanel(gui.settingsDialogs.SettingsPanel):
 		"""
 		# Make sure we're operating in the "normal" profile
 		if config.conf.profiles[-1].name is None and len(config.conf.profiles) == 1:
-			config.conf['captionLocal']['modelsDir'] = self.modelPathEdit.GetValue()
 			config.conf['captionLocal']['loadModelWhenInit'] = self.loadModelWhenInit.GetValue()
+			config.conf['captionLocal']['copyToClipboard'] = self.copyToClipboard.GetValue()
 		else:
 			log.debugWarning('No configuration saved for CaptionLocal since the current profile is not the default one.')

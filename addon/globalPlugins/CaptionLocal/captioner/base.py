@@ -7,6 +7,9 @@
 from abc import ABC, abstractmethod
 
 
+from typing import Callable
+
+
 class ImageCaptioner(ABC):
 	"""Abstract interface for image caption generation.
 
@@ -14,12 +17,18 @@ class ImageCaptioner(ABC):
 	"""
 
 	@abstractmethod
-	def generateCaption(self, image: str | bytes, maxLength: int | None = None) -> str:
+	def generateCaption(
+		self,
+		image: str | bytes,
+		maxLength: int | None = None,
+		onToken: Callable[[str], None] | None = None,
+	) -> str:
 		"""
 		Generate a caption for the given image.
 
 		:param image: Image file path or binary data.
 		:param maxLength: Optional maximum length for the generated caption.
+		:param onToken: Optional callback for each generated token (for streaming).
 		:return: The generated image caption as a string.
 		"""
 		pass
