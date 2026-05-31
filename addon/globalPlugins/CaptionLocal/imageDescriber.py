@@ -181,7 +181,7 @@ class ImageDescriber(ContentRecognizer):
 			from . import customEndpointConfig
 			if not customEndpointConfig.is_config_valid(configPath):
 				def show_ui():
-					if wx.CallAfter(customEndpointConfig.show_config_dialog(None, configPath)):
+					if customEndpointConfig.show_config_dialog(None, configPath):
 						# Reload after config
 						self.loadModelInBackground(localModelDirPath)
 					else:
@@ -189,6 +189,50 @@ class ImageDescriber(ContentRecognizer):
 				
 				wx.CallAfter(show_ui)
 				return
+
+		# Runtime Dependency Check
+		from .dependencyManager import DependencyManager
+		dm = DependencyManager()
+		runtimes = dm.get_required_runtimes(currentModel)
+		missing = [r for r in runtimes if not dm.is_runtime_installed(r)]
+		if missing:
+			def start_download():
+				if wx.MessageBox(
+					_("This model requires additional components (runtimes). Would you like to download them now?"),
+					_("Download Dependencies"),
+					wx.YES_NO | wx.ICON_QUESTION
+				) == wx.YES:
+					progress = wx.ProgressDialog(
+						_("Downloading Dependencies"),
+						_("Preparing..."),
+						maximum=100,
+						parent=gui.mainFrame,
+						style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME
+					)
+					
+					def download_worker():
+						try:
+							for runtime_id in missing:
+								def cb(file, down, total, pct):
+									wx.CallAfter(progress.Update, int(pct), _("Downloading {file}...").format(file=file))
+								
+								if not dm.download_and_install(runtime_id, progress_callback=cb):
+									raise Exception(f"Failed to install {runtime_id}")
+							
+							wx.CallAfter(progress.Destroy)
+							# Retry loading model
+							self.loadModelInBackground(localModelDirPath)
+						except Exception as e:
+							log.exception("Dependency download failed")
+							wx.CallAfter(progress.Destroy)
+							wx.CallAfter(ui.message, _("Dependency download failed: {error}").format(error=e))
+					
+					threading.Thread(target=download_worker, daemon=True).start()
+				else:
+					ui.message(_("Model cannot be loaded without dependencies."))
+			
+			wx.CallAfter(start_download)
+			return
 		
 		encoderPath = os.path.join(localModelDirPath, "onnx", "encoder_model_quantized.onnx")
 		decoderPath = os.path.join(localModelDirPath, "onnx", "decoder_model_merged_quantized.onnx")

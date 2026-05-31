@@ -94,6 +94,6 @@ def is_config_valid(config_path):
 	try:
 		with open(config_path, "r", encoding="utf-8") as f:
 			config = json.load(f)
-		return all(k in config for k in ["endpoint", "api_key", "model"])
+		return all(k in config for k in ["endpoint", "model"])
 	except Exception:
 		return False
