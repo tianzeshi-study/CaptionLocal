@@ -40,5 +40,8 @@ def imageCaptionerFactory(
 		from .qwen import QwenImageCaptioner
 		modelDir = os.path.dirname(configPath)
 		return QwenImageCaptioner(modelDir)
+	elif modelArchitecture == "CustomEndpoint":
+		from .customEndpoint import CustomEndpointCaptioner
+		return CustomEndpointCaptioner.from_config(configPath)
 	else:
 		raise NotImplementedError(f"Unsupported model architecture: {modelArchitecture}")
