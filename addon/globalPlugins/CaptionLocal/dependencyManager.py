@@ -11,6 +11,7 @@ import zipfile
 import io
 import requests
 import threading
+import re
 from typing import Callable, List, Optional, Dict
 from logHandler import log
 
@@ -58,7 +59,10 @@ class DependencyManager:
 			# Check for the binary specifically
 			cli_path = os.path.join(LIBS_DIR, "bin", "miniqwen-cli.exe")
 			return os.path.exists(cli_path)
-		return False
+		
+		# For others, check if the package directory exists
+		norm_name = runtime_id.replace("-", "_").lower()
+		return os.path.exists(os.path.join(LIBS_DIR, norm_name))
 
 	def download_and_install(self, runtime_id: str, progress_callback: Optional[ProgressCallback] = None) -> bool:
 		"""Download and install a runtime dependency."""
@@ -68,18 +72,28 @@ class DependencyManager:
 			return False
 
 		if info.get("type") == "pypi":
-			return self._install_from_pypi(runtime_id, info, progress_callback)
+			package_spec = info.get("package", runtime_id)
+			version = info.get("version")
+			py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+			if "versions" in info:
+				version = info["versions"].get(py_ver, version)
+			
+			self.installed_in_session = set()
+			return self._install_package(package_spec, version, progress_callback)
 		
 		return False
 
-	def _install_from_pypi(self, runtime_id: str, info: dict, progress_callback: Optional[ProgressCallback]) -> bool:
-		package_name = info.get("package", runtime_id).split("[")[0] # Remove extras
+	def _install_package(self, package_spec: str, version: Optional[str] = None, progress_callback: Optional[ProgressCallback] = None) -> bool:
+		# Parse name and extras
+		match = re.match(r"^([a-zA-Z0-9._-]+)(?:\[([a-zA-Z0-9._,-]+)\])?.*", package_spec)
+		if not match:
+			return False
+		package_name = match.group(1)
+		extras = match.group(2).split(",") if match.group(2) else []
 		
-		# Get correct version based on Python version if specified
-		version = info.get("version")
-		py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
-		if "versions" in info:
-			version = info["versions"].get(py_ver, version)
+		if package_name.lower() in self.installed_in_session:
+			return True
+		self.installed_in_session.add(package_name.lower())
 
 		try:
 			# 1. Fetch metadata from PyPI
@@ -92,39 +106,60 @@ class DependencyManager:
 			data = resp.json()
 			
 			# 2. Find best matching wheel
-			# Targets: win_amd64 and current python version
 			releases = data.get("urls", [])
 			best_url = None
+			best_score = -1
+			filename_matched = ""
 			file_size = 0
 			
-			py_tag = f"cp{sys.version_info.major}{sys.version_info.minor}"
-			# Also consider universal wheels or those with correct abi tags
+			curr_py_tag = f"cp{sys.version_info.major}{sys.version_info.minor}"
 			
 			for release in releases:
 				filename = release.get("filename", "")
 				if not filename.endswith(".whl"):
 					continue
-				if "win_amd64" not in filename:
+				
+				try:
+					tags_part = filename[:-4].rsplit("-", 3)
+					if len(tags_part) < 3:
+						continue
+					f_py, f_abi, f_plat = tags_part[-3], tags_part[-2], tags_part[-1]
+					
+					p_score = -1
+					if f_plat == "win_amd64":
+						p_score = 2
+					elif f_plat == "any":
+						p_score = 1
+					
+					if p_score == -1:
+						continue
+					
+					py_score = -1
+					if curr_py_tag in f_py:
+						py_score = 2
+					elif f_py == "py3" or f_py == "py3-none":
+						py_score = 1
+					
+					if py_score == -1:
+						continue
+					
+					score = p_score * 10 + py_score
+					if score > best_score:
+						best_score = score
+						best_url = release.get("url")
+						file_size = release.get("size", 0)
+						filename_matched = filename
+						if score == 22: break
+				except Exception:
 					continue
-				
-				# Check python version compatibility in filename
-				# e.g., onnxruntime-1.19.2-cp311-cp311-win_amd64.whl
-				parts = filename.split("-")
-				if len(parts) < 5: continue
-				
-				file_py_tag = parts[2]
-				if file_py_tag == "py3" or py_tag in file_py_tag:
-					best_url = release.get("url")
-					file_size = release.get("size", 0)
-					break
 			
 			if not best_url:
-				log.error(f"Could not find compatible wheel for {package_name} on {py_tag} win_amd64")
+				log.error(f"No compatible wheel for {package_name}")
 				return False
 
-			# 3. Download the wheel
+			# 3. Download and Unzip
 			if progress_callback:
-				progress_callback(filename, 0, file_size, 0.0)
+				progress_callback(filename_matched, 0, file_size, 0.0)
 
 			download_resp = requests.get(best_url, stream=True, timeout=30)
 			download_resp.raise_for_status()
@@ -136,22 +171,48 @@ class DependencyManager:
 					content.write(chunk)
 					downloaded += len(chunk)
 					if progress_callback:
-						progress_callback(filename, downloaded, file_size, (downloaded/file_size)*100 if file_size else 0)
+						progress_callback(filename_matched, downloaded, file_size, (downloaded/file_size)*100 if file_size else 0)
 
-			# 4. Unzip into libs
 			content.seek(0)
 			with zipfile.ZipFile(content) as zf:
-				# Filter out metadata and unnecessary files if desired, but for now just extract all
 				zf.extractall(LIBS_DIR)
 			
-			# Special post-install for miniqinference to move the exe if needed
-			if runtime_id == "miniqinference":
+			# 4. Handle dependencies
+			requires = data.get("info", {}).get("requires_dist", [])
+			if requires:
+				for req in requires:
+					# Simple marker evaluation
+					if ";" in req:
+						dep_spec, marker = req.split(";", 1)
+						dep_spec = dep_spec.strip()
+						marker = marker.strip()
+						
+						# Check for extra and platform
+						keep = True
+						if "extra ==" in marker:
+							m_extra = re.search(r"extra == ['\"]([^'\"]+)['\"]", marker)
+							if m_extra and m_extra.group(1) not in extras:
+								keep = False
+						if "sys_platform ==" in marker:
+							if "win32" not in marker:
+								keep = False
+						
+						if not keep:
+							continue
+					else:
+						dep_spec = req.strip()
+					
+					# Recursive install
+					self._install_package(dep_spec, progress_callback=progress_callback)
+
+			# 5. Post-install fixes
+			if package_name.lower() == "miniqinference" or "miniqinference" in package_spec.lower():
 				self._fix_miniqinference_paths()
 
 			return True
 
 		except Exception:
-			log.exception(f"Failed to install {runtime_id} from PyPI")
+			log.exception(f"Failed to install {package_spec}")
 			return False
 
 	def _fix_miniqinference_paths(self):

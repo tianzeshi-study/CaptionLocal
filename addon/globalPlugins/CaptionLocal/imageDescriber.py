@@ -16,6 +16,7 @@ from threading import Thread
 import os
 import ctypes
 
+import gui
 import wx
 import config
 from logHandler import log
@@ -169,10 +170,10 @@ class ImageDescriber(ContentRecognizer):
 
 		:param localModelDirPath: path of model directory
 		"""
+		currentModel = config.conf["captionLocal"]["currentModel"]
 
 		if not localModelDirPath:
 			modelsDir = config.conf["captionLocal"]["modelsDir"]
-			currentModel = config.conf["captionLocal"]["currentModel"]
 			localModelDirPath = os.path.join(modelsDir, currentModel)
 
 		# Special handling for custom/endpoint
