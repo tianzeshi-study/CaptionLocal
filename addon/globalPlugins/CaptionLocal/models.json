@@ -58,6 +58,14 @@
 				"config.json",
 				"preprocessor_config.json"
 			]
+		},
+		{
+			"id": "custom/endpoint",
+			"name": "Custom OpenAI-compatible API Endpoint",
+			"resolvePath": "",
+			"files": [
+				"config.json"
+			]
 		}
 			]
 }
