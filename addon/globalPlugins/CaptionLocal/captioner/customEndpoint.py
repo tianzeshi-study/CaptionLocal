@@ -48,7 +48,7 @@ class CustomEndpointCaptioner(ImageCaptioner):
 		model = config.get("model")
 		prompt = config.get("prompt", None)
 		
-		if endpoint and api_key and model:
+		if endpoint and model:
 			return cls(endpoint, api_key, model, prompt)
 			
 		raise ValueError(f"Invalid custom endpoint configuration in {config_path}")
@@ -72,9 +72,10 @@ class CustomEndpointCaptioner(ImageCaptioner):
 			base64_image = base64.b64encode(img_data).decode('utf-8')
 			
 			headers = {
-				"Content-Type": "application/json",
-				"Authorization": f"Bearer {self.api_key}"
+				"Content-Type": "application/json"
 			}
+			if self.api_key:
+				headers["Authorization"] = f"Bearer {self.api_key}"
 			
 			payload = {
 				"model": self.model,
