@@ -11,14 +11,19 @@ It allows users to capture screen regions and generate captions using local AI m
 """
 
 import io
+import json
 import threading
 from threading import Thread
 import os
 import ctypes
+from typing import Callable, Dict
+
+ProgressCallback = Callable[[str, int, int, float], None]
 
 import gui
 import wx
 import config
+from gui.message import MessageDialog, DefaultButton, ReturnCode, DialogType
 from logHandler import log
 import ui
 import api
@@ -33,6 +38,146 @@ try:
 	addonHandler.initTranslation()
 except:
 	pass
+
+
+class ImageDescDownloader:
+	"""Helper class to manage model downloads with progress dialog,
+	matching the pattern in gui_localCaptioner.
+	"""
+	_downloadThread: Thread | None = None
+
+	def __init__(self, modelId: str, filesToDownload: list, resolvePath: str, completionCallback: Callable):
+		self.modelId = modelId
+		self.filesToDownload = filesToDownload
+		self.resolvePath = resolvePath
+		self.completionCallback = completionCallback
+		self.downloadDict: Dict[str, tuple[int, int]] = {}
+		self.modelDownloader: 'ModelDownloader' | None = None
+		self._shouldCancel = False
+		self._progressDialog: wx.ProgressDialog | None = None
+
+	def onDownload(self, progressCallback: ProgressCallback) -> None:
+		from .modelDownloader import ModelDownloader
+		self.modelDownloader = ModelDownloader()
+		import config
+		baseModelsDir = config.conf["captionLocal"]["modelsDir"]
+		(success, fail) = self.modelDownloader.downloadModelsMultithreaded(
+			modelsDir=baseModelsDir,
+			modelName=self.modelId,
+			filesToDownload=self.filesToDownload,
+			resolvePath=self.resolvePath,
+			progressCallback=progressCallback,
+		)
+		if len(fail) == 0:
+			wx.CallAfter(self.openSuccessDialog)
+		else:
+			wx.CallAfter(self.openFailDialog)
+
+	def openSuccessDialog(self) -> None:
+		confirmationButton = (DefaultButton.OK.value._replace(defaultFocus=True, fallbackAction=True),)
+		self._stopped()
+		
+		dialog = MessageDialog(
+			parent=None,
+			title=_("Download successful"),
+			message=_("Model {modelId} installed successfully.").format(modelId=self.modelId),
+			dialogType=DialogType.STANDARD,
+			buttons=confirmationButton,
+		)
+
+		if dialog.ShowModal() == ReturnCode.OK:
+			if self.completionCallback:
+				self.completionCallback(True)
+
+	def openFailDialog(self) -> None:
+		if self._shouldCancel:
+			return
+
+		confirmationButtons = (
+			DefaultButton.YES.value._replace(defaultFocus=True, fallbackAction=False),
+			DefaultButton.NO.value._replace(defaultFocus=False, fallbackAction=True),
+		)
+
+		dialog = MessageDialog(
+			parent=None,
+			title=_("Download failed"),
+			message=_("Model download failed. Would you like to retry?"),
+			dialogType=DialogType.WARNING,
+			buttons=confirmationButtons,
+		)
+
+		if dialog.ShowModal() == ReturnCode.YES:
+			self.doDownload()
+		else:
+			self._stopped()
+			if self.completionCallback:
+				self.completionCallback(False)
+
+	def openDownloadDialog(self) -> None:
+		if ImageDescDownloader._downloadThread is not None and ImageDescDownloader._downloadThread.is_alive():
+			ui.message(_("image captioning is still downloading, please wait..."))
+			return
+		
+		confirmationButtons = (
+			DefaultButton.YES.value._replace(defaultFocus=True, fallbackAction=False),
+			DefaultButton.NO.value._replace(defaultFocus=False, fallbackAction=True),
+		)
+
+		dialog = MessageDialog(
+			parent=None,
+			title=_("Confirm download"),
+			message=_("Model {modelId} not installed. Would you like to install?").format(modelId=self.modelId),
+			dialogType=DialogType.WARNING,
+			buttons=confirmationButtons,
+		)
+
+		if dialog.ShowModal() == ReturnCode.YES:
+			self._progressDialog = wx.ProgressDialog(
+				_("Downloading Model"),
+				_("Connecting"),
+				style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME | wx.PD_AUTO_HIDE,
+				parent=gui.mainFrame,
+			)
+			self.doDownload()
+
+	def doDownload(self):
+		def progressCallback(
+			fileName: str,
+			downloadedBytes: int,
+			totalBytes: int,
+			_percentage: float,
+		) -> None:
+			self.downloadDict[fileName] = (downloadedBytes, totalBytes)
+			downloadedSum = sum(d for d, _ in self.downloadDict.values())
+			totalSum = sum(t for _, t in self.downloadDict.values())
+			ratio = downloadedSum / totalSum if totalSum > 0 else 0.0
+			totalProgress = int(ratio * 100)
+			
+			# UPDATE PROGRESS ONLY WHEN ALL FILES ARE TRACKED
+			# This matches reference and fixes the early 100% bug
+			if len(self.downloadDict) == len(self.filesToDownload):
+				if self._progressDialog:
+					cont, skip = self._progressDialog.Update(totalProgress, _("Downloading..."))
+					if not cont:
+						self._shouldCancel = True
+						self._stopped()
+
+		ImageDescDownloader._downloadThread = threading.Thread(
+			target=self.onDownload,
+			name="ModelDownloadThread",
+			daemon=False,
+			args=(progressCallback,),
+		)
+		ImageDescDownloader._downloadThread.start()
+
+	def _stopped(self):
+		if self.modelDownloader:
+			self.modelDownloader.requestCancel()
+		ImageDescDownloader._downloadThread = None
+		if self._progressDialog:
+			self._progressDialog.Hide()
+			self._progressDialog.Destroy()
+			self._progressDialog = None
 
 
 class ImageDescriber(ContentRecognizer):
@@ -53,6 +198,12 @@ class ImageDescriber(ContentRecognizer):
 		self.loadModelThread: Thread | None = None
 		self._current_text = ""
 		self._onResult_callback = None
+		
+		# For model download tracking
+		self._activeDownloader: 'ModelDownloader' | None = None
+		self._progressDialog: wx.ProgressDialog | None = None
+		self.downloadDict: Dict[str, tuple[int, int]] = {}
+		self._shouldCancel = False
 
 		enable = config.conf["captionLocal"]["loadModelWhenInit"]
 		# Load model when initializing
@@ -165,6 +316,126 @@ class ImageDescriber(ContentRecognizer):
 		# For now, we don't have a good way to kill the thread/onnx inference safely.
 		self._onResult_callback = None
 
+	def _showDownloadDialog(self, modelId: str, localModelDirPath: str):
+		def show_ui():
+			confirmationButtons = (
+				DefaultButton.YES.value._replace(defaultFocus=True, fallbackAction=False),
+				DefaultButton.NO.value._replace(defaultFocus=False, fallbackAction=True),
+			)
+			
+			dialog = MessageDialog(
+				parent=None,
+				title=_("Confirm download"),
+				message=_("Model {modelId} not found. Would you like to download it now?").format(modelId=modelId),
+				dialogType=DialogType.WARNING,
+				buttons=confirmationButtons,
+			)
+
+			if dialog.ShowModal() != ReturnCode.YES:
+				return
+
+			# Load model config to get files list
+			filesToDownload = []
+			resolvePath = "/resolve/main"
+			try:
+				config_file = os.path.join(os.path.dirname(__file__), "models.json")
+				if os.path.exists(config_file):
+					with open(config_file, "r", encoding="utf-8") as f:
+						data = json.load(f)
+						for m in data.get("models", []):
+							if m.get("id") == modelId:
+								filesToDownload = m.get("files", [])
+								resolvePath = m.get("resolvePath", "/resolve/main")
+								break
+			except Exception:
+				log.exception("Failed to load models.json")
+			
+			if not filesToDownload:
+				# Fallback to vit-gpt2 files
+				filesToDownload = [
+					"onnx/encoder_model_quantized.onnx",
+					"onnx/decoder_model_merged_quantized.onnx", 
+					"config.json",
+					"vocab.json",
+					"preprocessor_config.json"
+				]
+
+			self._progressDialog = wx.ProgressDialog(
+				_("Downloading Model"),
+				_("Connecting"),
+				maximum=100,
+				parent=gui.mainFrame,
+				style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME
+			)
+			
+			self.downloadDict = {}
+			self._shouldCancel = False
+			
+			from .modelDownloader import ModelDownloader
+			self._activeDownloader = ModelDownloader()
+
+			def download_worker():
+				try:
+					def cb(fileName, downloaded, total, pct):
+						self.downloadDict[fileName] = (downloaded, total)
+						# Guard: only update progress when all files have reported their sizes
+						if len(self.downloadDict) != len(filesToDownload):
+							return
+						downloadedSum = sum(d for d, _ in self.downloadDict.values())
+						totalSum = sum(t for _, t in self.downloadDict.values())
+						ratio = downloadedSum / totalSum if totalSum > 0 else 0.0
+						totalProgress = int(ratio * 100)
+
+						if self._progressDialog:
+							cont, skip = self._progressDialog.Update(totalProgress, _("Downloading..."))
+							if not cont:
+								self._shouldCancel = True
+								if self._activeDownloader:
+									self._activeDownloader.requestCancel()
+
+					localModelDirPath_norm = os.path.normpath(localModelDirPath)
+					# Our downloader expects modelsDir and modelName separately
+					import config
+					baseModelsDir = config.conf["captionLocal"]["modelsDir"]
+
+					successful, failed = self._activeDownloader.downloadModelsMultithreaded(
+						modelsDir=baseModelsDir,
+						modelName=modelId,
+						filesToDownload=filesToDownload,
+						resolvePath=resolvePath,
+						progressCallback=cb
+					)
+
+					if not failed and not self._activeDownloader.cancelRequested:
+						wx.CallAfter(self._cleanupDownload, True, localModelDirPath_norm)
+					else:
+						wx.CallAfter(self._cleanupDownload, False, localModelDirPath_norm)
+				except Exception as e:
+					log.exception("Model download failed")
+					wx.CallAfter(self._cleanupDownload, False, localModelDirPath, str(e))
+
+			threading.Thread(target=download_worker, name="ModelDownloadThread", daemon=False).start()
+
+		wx.CallAfter(show_ui)
+
+	def _cleanupDownload(self, success: bool, localModelDirPath: str, error: str | None = None):
+		if self._activeDownloader:
+			self._activeDownloader.requestCancel()
+			self._activeDownloader = None
+		if self._progressDialog:
+			self._progressDialog.Hide()
+			self._progressDialog.Destroy()
+			self._progressDialog = None
+
+		if success:
+			ui.message(_("Model downloaded successfully."))
+			self.loadModelInBackground(localModelDirPath)
+		else:
+			if error:
+				ui.message(_("Model download failed: {error}").format(error=error))
+			elif not self._shouldCancel:
+				ui.message(_("Model download failed."))
+
 	def _loadModel(self, localModelDirPath: str | None = None) -> None:
 		"""Load the ONNX model for image captioning.
 
@@ -174,10 +445,24 @@ class ImageDescriber(ContentRecognizer):
 
 		if not localModelDirPath:
 			modelsDir = config.conf["captionLocal"]["modelsDir"]
+			# Ensure modelsDir exists
+			if not os.path.exists(modelsDir):
+				try:
+					os.makedirs(modelsDir, exist_ok=True)
+				except Exception:
+					log.exception(f"Failed to create models directory: {modelsDir}")
+			
 			localModelDirPath = os.path.join(modelsDir, currentModel)
+		
+		localModelDirPath = os.path.normpath(localModelDirPath)
 
 		# Special handling for custom/endpoint
 		configPath = os.path.join(localModelDirPath, "config.json")
+
+		if currentModel != "custom/endpoint" and not os.path.exists(configPath):
+			self._showDownloadDialog(currentModel, localModelDirPath)
+			return
+
 		if currentModel == "custom/endpoint" or (os.path.exists(configPath) and "CustomEndpoint" in open(configPath, "r", encoding="utf-8").read()):
 			from . import customEndpointConfig
 			if not customEndpointConfig.is_config_valid(configPath):
@@ -198,37 +483,54 @@ class ImageDescriber(ContentRecognizer):
 		missing = [r for r in runtimes if not dm.is_runtime_installed(r)]
 		if missing:
 			def start_download():
-				if wx.MessageBox(
-					_("This model requires additional components (runtimes). Would you like to download them now?"),
-					_("Download Dependencies"),
-					wx.YES_NO | wx.ICON_QUESTION
-				) == wx.YES:
-					progress = wx.ProgressDialog(
+				confirmationButtons = (
+					DefaultButton.YES.value._replace(defaultFocus=True, fallbackAction=False),
+					DefaultButton.NO.value._replace(defaultFocus=False, fallbackAction=True),
+				)
+				
+				dialog = MessageDialog(
+					parent=None,
+					title=_("Download Dependencies"),
+					message=_("This model requires additional components (runtimes). Would you like to download them now?"),
+					dialogType=DialogType.WARNING,
+					buttons=confirmationButtons,
+				)
+
+				if dialog.ShowModal() == ReturnCode.YES:
+					self._progressDialog = wx.ProgressDialog(
 						_("Downloading Dependencies"),
 						_("Preparing..."),
 						maximum=100,
 						parent=gui.mainFrame,
-						style=wx.PD_AUTO_HIDE | wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME
+						style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME
 					)
+					
+					self._shouldCancel = False
 					
 					def download_worker():
 						try:
 							for runtime_id in missing:
+								if self._shouldCancel:
+									break
+
 								def cb(file, down, total, pct):
-									wx.CallAfter(progress.Update, int(pct), _("Downloading {file}...").format(file=file))
-								
+									if self._progressDialog and not self._shouldCancel:
+										cont, skip = self._progressDialog.Update(int(pct), _("Downloading {file}...").format(file=file))
+										if not cont:
+											self._shouldCancel = True
+
 								if not dm.download_and_install(runtime_id, progress_callback=cb):
 									raise Exception(f"Failed to install {runtime_id}")
-							
-							wx.CallAfter(progress.Destroy)
-							# Retry loading model
-							self.loadModelInBackground(localModelDirPath)
+
+							if not self._shouldCancel:
+								wx.CallAfter(self._cleanupDownload, True, localModelDirPath)
+							else:
+								wx.CallAfter(self._cleanupDownload, False, localModelDirPath)
 						except Exception as e:
 							log.exception("Dependency download failed")
-							wx.CallAfter(progress.Destroy)
-							wx.CallAfter(ui.message, _("Dependency download failed: {error}").format(error=e))
-					
-					threading.Thread(target=download_worker, daemon=True).start()
+							wx.CallAfter(self._cleanupDownload, False, localModelDirPath, str(e))
+
+					threading.Thread(target=download_worker, name="DependencyDownloadThread", daemon=False).start()
 				else:
 					ui.message(_("Model cannot be loaded without dependencies."))
 			
@@ -248,7 +550,7 @@ class ImageDescriber(ContentRecognizer):
 			)
 		except FileNotFoundError:
 			self.isModelLoaded = False
-			ui.message(_("Model not found. Please use Model Manager to download."))
+			self._showDownloadDialog(currentModel, localModelDirPath)
 		except Exception:
 			self.isModelLoaded = False
 			wx.CallAfter(ui.message, _("failed to load image captioner"))

@@ -45,7 +45,7 @@ _modelsDir = os.path.abspath(os.path.join(_here, "..", "..", "models"))
 
 CONFSPEC = {
 	"modelsDir": f"string(default={_modelsDir})",
-	"currentModel": "string(default=Xenova/vit-gpt2-image-captioning)",
+	"currentModel": "string(default=onnx-community/Qwen3.5-0.8B-ONNX)",
 	"loadModelWhenInit": "boolean(default=true)",
 	"copyToClipboard": "boolean(default=false)"
 }
