@@ -140,6 +140,16 @@ class ImageDescDownloader:
 			)
 			self.doDownload()
 
+	def _updateProgress(self, progress: int, message: str):
+		if self._progressDialog:
+			try:
+				cont, skip = self._progressDialog.Update(progress, message)
+				if not cont:
+					self._shouldCancel = True
+					self._stopped()
+			except Exception:
+				pass
+
 	def doDownload(self):
 		def progressCallback(
 			fileName: str,
@@ -152,15 +162,12 @@ class ImageDescDownloader:
 			totalSum = sum(t for _, t in self.downloadDict.values())
 			ratio = downloadedSum / totalSum if totalSum > 0 else 0.0
 			totalProgress = int(ratio * 100)
-			
+
 			# UPDATE PROGRESS ONLY WHEN ALL FILES ARE TRACKED
 			# This matches reference and fixes the early 100% bug
 			if len(self.downloadDict) == len(self.filesToDownload):
-				if self._progressDialog:
-					cont, skip = self._progressDialog.Update(totalProgress, _("Downloading..."))
-					if not cont:
-						self._shouldCancel = True
-						self._stopped()
+				if self._progressDialog and not self._shouldCancel:
+					wx.CallAfter(self._updateProgress, totalProgress, _("Downloading..."))
 
 		ImageDescDownloader._downloadThread = threading.Thread(
 			target=self.onDownload,
@@ -386,12 +393,9 @@ class ImageDescriber(ContentRecognizer):
 						ratio = downloadedSum / totalSum if totalSum > 0 else 0.0
 						totalProgress = int(ratio * 100)
 
-						if self._progressDialog:
-							cont, skip = self._progressDialog.Update(totalProgress, _("Downloading..."))
-							if not cont:
-								self._shouldCancel = True
-								if self._activeDownloader:
-									self._activeDownloader.requestCancel()
+						if self._progressDialog and not self._shouldCancel:
+							msg = _("Downloading... ({pct}%)").format(pct=totalProgress)
+							wx.CallAfter(self._updateProgressDialog, totalProgress, msg)
 
 					localModelDirPath_norm = os.path.normpath(localModelDirPath)
 					# Our downloader expects modelsDir and modelName separately
@@ -417,6 +421,17 @@ class ImageDescriber(ContentRecognizer):
 			threading.Thread(target=download_worker, name="ModelDownloadThread", daemon=False).start()
 
 		wx.CallAfter(show_ui)
+
+	def _updateProgressDialog(self, progress: int, message: str):
+		if self._progressDialog:
+			try:
+				cont, skip = self._progressDialog.Update(progress, message)
+				if not cont:
+					self._shouldCancel = True
+					if self._activeDownloader:
+						self._activeDownloader.requestCancel()
+			except Exception:
+				pass
 
 	def _cleanupDownload(self, success: bool, localModelDirPath: str, error: str | None = None):
 		if self._activeDownloader:
@@ -515,9 +530,14 @@ class ImageDescriber(ContentRecognizer):
 
 								def cb(file, down, total, pct):
 									if self._progressDialog and not self._shouldCancel:
-										cont, skip = self._progressDialog.Update(int(pct), _("Downloading {file}...").format(file=file))
-										if not cont:
-											self._shouldCancel = True
+										if file.startswith("[EXTRACTING]"):
+											clean_name = file.replace("[EXTRACTING]", "")
+											msg = _("Extracting and installing {file}...").format(file=clean_name)
+										elif pct >= 100:
+											msg = _("Extracting {file}...").format(file=file)
+										else:
+											msg = _("Downloading {file}... ({pct}%)").format(file=file, pct=int(pct))
+										wx.CallAfter(self._updateProgressDialog, int(pct), msg)
 
 								if not dm.download_and_install(runtime_id, progress_callback=cb):
 									raise Exception(f"Failed to install {runtime_id}")

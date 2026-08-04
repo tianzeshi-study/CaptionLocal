@@ -174,8 +174,15 @@ class DependencyManager:
 						progress_callback(filename_matched, downloaded, file_size, (downloaded/file_size)*100 if file_size else 0)
 
 			content.seek(0)
+			if progress_callback:
+				progress_callback(f"[EXTRACTING]{filename_matched}", file_size, file_size, 100.0)
+
+			os.makedirs(LIBS_DIR, exist_ok=True)
 			with zipfile.ZipFile(content) as zf:
 				zf.extractall(LIBS_DIR)
+
+			if LIBS_DIR not in sys.path:
+				sys.path.insert(0, LIBS_DIR)
 			
 			# 4. Handle dependencies
 			requires = data.get("info", {}).get("requires_dist", [])
