@@ -414,8 +414,11 @@ class ModelManagerFrame(wx.Frame):
 			
 		self.downloadBtn.SetLabel(_("Cancel Download"))
 		SoundNotification.playStart()
-		self.downloadThread = threading.Thread(target=self._downloadWorker)
-		self.downloadThread.daemon = True
+		self.downloadThread = threading.Thread(
+			target=self._downloadWorker,
+			name="ModelManagerDownloadThread",
+			daemon=False
+		)
 		self.downloadThread.start()
 		
 	def _downloadWorker(self):
@@ -463,4 +466,5 @@ class ModelManagerFrame(wx.Frame):
 		if self.downloadThread and self.downloadThread.is_alive():
 			if self.downloader:
 				self.downloader.requestCancel()
+			self.downloadThread.join(timeout=2.0)
 		self.Destroy()
