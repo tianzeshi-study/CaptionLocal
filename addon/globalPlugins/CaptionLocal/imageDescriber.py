@@ -195,6 +195,114 @@ class ImageDescDownloader:
 			wx.CallLater(50, gui.mainFrame.postPopup)
 
 
+class DependencyDownloader:
+	"""Downloads runtime dependencies with progress dialog."""
+
+	def __init__(self, missing_runtimes, dm, localModelDirPath, completionCallback):
+		self.missing_runtimes = missing_runtimes
+		self.dm = dm
+		self.localModelDirPath = localModelDirPath
+		self.completionCallback = completionCallback
+		self._shouldCancel = False
+		self._progressDialog: wx.ProgressDialog | None = None
+		self._isUpdatingProgress = False
+		self._downloadThread: Thread | None = None
+
+	def openDownloadDialog(self):
+		confirmationButtons = (
+			DefaultButton.YES.value._replace(defaultFocus=True, fallbackAction=False),
+			DefaultButton.NO.value._replace(defaultFocus=False, fallbackAction=True),
+		)
+
+		dialog = MessageDialog(
+			parent=None,
+			title=_("Download Dependencies"),
+			message=_("This model requires additional components (runtimes). Would you like to download them now?"),
+			dialogType=DialogType.WARNING,
+			buttons=confirmationButtons,
+		)
+
+		if dialog.ShowModal() == ReturnCode.YES:
+			gui.mainFrame.prePopup()
+			self._progressDialog = wx.ProgressDialog(
+				_("Downloading Dependencies"),
+				_("Preparing..."),
+				maximum=100,
+				parent=gui.mainFrame,
+				style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME | wx.PD_AUTO_HIDE
+			)
+			self._shouldCancel = False
+			self.doDownload()
+		else:
+			ui.message(_("Model cannot be loaded without dependencies."))
+
+	def _updateProgress(self, progress: int, message: str):
+		if self._isUpdatingProgress or not self._progressDialog:
+			return
+		self._isUpdatingProgress = True
+		try:
+			capped = min(max(int(progress), 0), 99)
+			cont, skip = self._progressDialog.Update(capped, message)
+			if not cont:
+				self._shouldCancel = True
+		except Exception:
+			pass
+		finally:
+			self._isUpdatingProgress = False
+
+	def doDownload(self):
+		def download_worker():
+			try:
+				for runtime_id in self.missing_runtimes:
+					if self._shouldCancel:
+						break
+
+					def cb(file, down, total, pct):
+						if self._progressDialog and not self._shouldCancel:
+							if file.startswith("[EXTRACTING]"):
+								clean_name = file.replace("[EXTRACTING]", "")
+								msg = _("Extracting and installing {file}...").format(file=clean_name)
+							elif pct >= 100:
+								msg = _("Extracting {file}...").format(file=file)
+							else:
+								msg = _("Downloading {file}... ({pct}%)").format(file=file, pct=int(pct))
+							wx.CallAfter(self._updateProgress, int(pct), msg)
+
+					if not self.dm.download_and_install(runtime_id, progress_callback=cb):
+						raise Exception(f"Failed to install {runtime_id}")
+
+				if not self._shouldCancel:
+					wx.CallAfter(self._onComplete, True)
+				else:
+					wx.CallAfter(self._onComplete, False)
+			except Exception as e:
+				log.exception("Dependency download failed")
+				wx.CallAfter(self._onComplete, False, str(e))
+
+		self._downloadThread = threading.Thread(
+			target=download_worker,
+			name="DependencyDownloadThread",
+			daemon=False,
+		)
+		self._downloadThread.start()
+
+	def _onComplete(self, success: bool, error: str | None = None):
+		if self._progressDialog:
+			self._progressDialog.Hide()
+			self._progressDialog.Destroy()
+			self._progressDialog = None
+			wx.CallLater(50, gui.mainFrame.postPopup)
+
+		if success:
+			if self.completionCallback:
+				self.completionCallback()
+		else:
+			if error:
+				ui.message(_("Dependency download failed: {error}").format(error=error))
+			elif not self._shouldCancel:
+				ui.message(_("Dependency download failed."))
+
+
 class ImageDescriber(ContentRecognizer):
 	"""module for local image caption functionality.
 
@@ -512,67 +620,14 @@ class ImageDescriber(ContentRecognizer):
 		runtimes = dm.get_required_runtimes(currentModel)
 		missing = [r for r in runtimes if not dm.is_runtime_installed(r)]
 		if missing:
-			def start_download():
-				confirmationButtons = (
-					DefaultButton.YES.value._replace(defaultFocus=True, fallbackAction=False),
-					DefaultButton.NO.value._replace(defaultFocus=False, fallbackAction=True),
-				)
-				
-				dialog = MessageDialog(
-					parent=None,
-					title=_("Download Dependencies"),
-					message=_("This model requires additional components (runtimes). Would you like to download them now?"),
-					dialogType=DialogType.WARNING,
-					buttons=confirmationButtons,
-				)
+			def on_deps_downloaded():
+				# Proceed to load the model after dependencies are installed
+				self.loadModelInBackground(localModelDirPath)
 
-				if dialog.ShowModal() == ReturnCode.YES:
-					gui.mainFrame.prePopup()
-					self._progressDialog = wx.ProgressDialog(
-						_("Downloading Dependencies"),
-						_("Preparing..."),
-						maximum=100,
-						parent=gui.mainFrame,
-						style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME | wx.PD_AUTO_HIDE
-					)
-					
-					self._shouldCancel = False
-					
-					def download_worker():
-						try:
-							for runtime_id in missing:
-								if self._shouldCancel:
-									break
-
-								def cb(file, down, total, pct):
-									if self._progressDialog and not self._shouldCancel:
-										if file.startswith("[EXTRACTING]"):
-											clean_name = file.replace("[EXTRACTING]", "")
-											msg = _("Extracting and installing {file}...").format(file=clean_name)
-										elif pct >= 100:
-											msg = _("Extracting {file}...").format(file=file)
-										else:
-											msg = _("Downloading {file}... ({pct}%)").format(file=file, pct=int(pct))
-										wx.CallAfter(self._updateProgressDialog, int(pct), msg)
-
-								if not dm.download_and_install(runtime_id, progress_callback=cb):
-									raise Exception(f"Failed to install {runtime_id}")
-
-							if not self._shouldCancel:
-								wx.CallAfter(self._cleanupDownload, True, localModelDirPath)
-							else:
-								wx.CallAfter(self._cleanupDownload, False, localModelDirPath)
-						except Exception as e:
-							log.exception("Dependency download failed")
-							wx.CallAfter(self._cleanupDownload, False, localModelDirPath, str(e))
-
-					threading.Thread(target=download_worker, name="DependencyDownloadThread", daemon=False).start()
-				else:
-					ui.message(_("Model cannot be loaded without dependencies."))
-			
-			wx.CallAfter(start_download)
+			downloader = DependencyDownloader(missing, dm, localModelDirPath, on_deps_downloaded)
+			wx.CallAfter(downloader.openDownloadDialog)
 			return
-		
+
 		encoderPath = os.path.join(localModelDirPath, "onnx", "encoder_model_quantized.onnx")
 		decoderPath = os.path.join(localModelDirPath, "onnx", "decoder_model_merged_quantized.onnx")
 
