@@ -591,6 +591,21 @@ class ImageDescriber(ContentRecognizer):
 					log.exception(f"Failed to create models directory: {modelsDir}")
 			
 			localModelDirPath = os.path.join(modelsDir, currentModel)
+
+		# Special handling for custom/endpoint
+		configPath = os.path.join(localModelDirPath, "config.json")
+		if currentModel == "custom/endpoint" or (os.path.exists(configPath) and "CustomEndpoint" in open(configPath, "r", encoding="utf-8").read()):
+			from . import customEndpointConfig
+			if not customEndpointConfig.is_config_valid(configPath):
+				def show_ui():
+					if wx.CallAfter(customEndpointConfig.show_config_dialog(None, configPath)):
+						# Reload after config
+						self.loadModelInBackground(localModelDirPath)
+					else:
+						ui.message(_("Custom endpoint not configured"))
+				
+				wx.CallAfter(show_ui)
+				return
 		
 		localModelDirPath = os.path.normpath(localModelDirPath)
 
