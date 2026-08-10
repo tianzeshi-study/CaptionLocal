@@ -31,9 +31,9 @@ class DependencyManager:
 
 	def __init__(self):
 		self.runtimes = {}
-		self._load_config()
+		self._loadConfig()
 
-	def _load_config(self):
+	def _loadConfig(self):
 		try:
 			if os.path.exists(MODELS_CONFIG_FILE):
 				with open(MODELS_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -43,14 +43,14 @@ class DependencyManager:
 		except Exception:
 			log.exception("Failed to load runtimes config")
 
-	def get_required_runtimes(self, model_id: str) -> List[str]:
+	def getRequiredRuntimes(self, model_id: str) -> List[str]:
 		"""Get a list of runtime IDs required by a model."""
 		for m in self.models:
 			if m.get("id") == model_id:
 				return m.get("runtime_dependencies", [])
 		return []
 
-	def is_runtime_installed(self, runtime_id: str) -> bool:
+	def isRuntimeInstalled(self, runtime_id: str) -> bool:
 		"""Check if a runtime is already installed in the libs directory."""
 		if runtime_id == "onnxruntime":
 			# Check for onnxruntime package directory
@@ -64,7 +64,7 @@ class DependencyManager:
 		norm_name = runtime_id.replace("-", "_").lower()
 		return os.path.exists(os.path.join(LIBS_DIR, norm_name))
 
-	def download_and_install(self, runtime_id: str, progress_callback: Optional[ProgressCallback] = None) -> bool:
+	def downloadAndInstall(self, runtime_id: str, progress_callback: Optional[ProgressCallback] = None) -> bool:
 		"""Download and install a runtime dependency."""
 		info = self.runtimes.get(runtime_id)
 		if not info:
@@ -79,11 +79,11 @@ class DependencyManager:
 				version = info["versions"].get(py_ver, version)
 			
 			self.installed_in_session = set()
-			return self._install_package(package_spec, version, progress_callback)
+			return self._installPackage(package_spec, version, progress_callback)
 		
 		return False
 
-	def _install_package(self, package_spec: str, version: Optional[str] = None, progress_callback: Optional[ProgressCallback] = None) -> bool:
+	def _installPackage(self, package_spec: str, version: Optional[str] = None, progress_callback: Optional[ProgressCallback] = None) -> bool:
 		# Parse name and extras
 		match = re.match(r"^([a-zA-Z0-9._-]+)(?:\[([a-zA-Z0-9._,-]+)\])?.*", package_spec)
 		if not match:
@@ -210,11 +210,11 @@ class DependencyManager:
 						dep_spec = req.strip()
 					
 					# Recursive install
-					self._install_package(dep_spec, progress_callback=progress_callback)
+					self._installPackage(dep_spec, progress_callback=progress_callback)
 
 			# 5. Post-install fixes
 			if package_name.lower() == "miniqinference" or "miniqinference" in package_spec.lower():
-				self._fix_miniqinference_paths()
+				self._fixMiniqinferencePaths()
 
 			return True
 
@@ -222,7 +222,7 @@ class DependencyManager:
 			log.exception(f"Failed to install {package_spec}")
 			return False
 
-	def _fix_miniqinference_paths(self):
+	def _fixMiniqinferencePaths(self):
 		"""miniqinference might put the exe in a subfolder or need to be moved to libs/bin."""
 		# In wheel, scripts usually go to {package}-{version}.data/scripts/
 		# But since we are extracting to LIBS_DIR, we need to find it.

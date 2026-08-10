@@ -268,7 +268,7 @@ class DependencyDownloader:
 								msg = _("Downloading {file}... ({pct}%)").format(file=file, pct=int(pct))
 							wx.CallAfter(self._updateProgress, int(pct), msg)
 
-					if not self.dm.download_and_install(runtime_id, progress_callback=cb):
+					if not self.dm.downloadAndInstall(runtime_id, progress_callback=cb):
 						raise Exception(f"Failed to install {runtime_id}")
 
 				if not self._shouldCancel:
@@ -617,8 +617,8 @@ class ImageDescriber(ContentRecognizer):
 		# Runtime Dependency Check
 		from .dependencyManager import DependencyManager
 		dm = DependencyManager()
-		runtimes = dm.get_required_runtimes(currentModel)
-		missing = [r for r in runtimes if not dm.is_runtime_installed(r)]
+		runtimes = dm.getRequiredRuntimes(currentModel)
+		missing = [r for r in runtimes if not dm.isRuntimeInstalled(r)]
 		if missing:
 			def on_deps_downloaded():
 				# Proceed to load the model after dependencies are installed
