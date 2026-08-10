@@ -12,6 +12,7 @@ It allows users to capture screen regions and generate captions using local AI m
 
 import io
 import json
+import time
 import threading
 from threading import Thread
 import os
@@ -132,6 +133,7 @@ class ImageDescDownloader:
 		)
 
 		if dialog.ShowModal() == ReturnCode.YES:
+			gui.mainFrame.prePopup()
 			self._progressDialog = wx.ProgressDialog(
 				_("Downloading Model"),
 				_("Connecting"),
@@ -141,14 +143,19 @@ class ImageDescDownloader:
 			self.doDownload()
 
 	def _updateProgress(self, progress: int, message: str):
-		if self._progressDialog:
-			try:
-				cont, skip = self._progressDialog.Update(progress, message)
-				if not cont:
-					self._shouldCancel = True
-					self._stopped()
-			except Exception:
-				pass
+		if getattr(self, "_isUpdatingProgress", False) or not self._progressDialog:
+			return
+		self._isUpdatingProgress = True
+		try:
+			capped = min(max(int(progress), 0), 99)
+			cont, skip = self._progressDialog.Update(capped, message)
+			if not cont:
+				self._shouldCancel = True
+				self._stopped()
+		except Exception:
+			pass
+		finally:
+			self._isUpdatingProgress = False
 
 	def doDownload(self):
 		def progressCallback(
@@ -185,6 +192,7 @@ class ImageDescDownloader:
 			self._progressDialog.Hide()
 			self._progressDialog.Destroy()
 			self._progressDialog = None
+			wx.CallLater(50, gui.mainFrame.postPopup)
 
 
 class ImageDescriber(ContentRecognizer):
@@ -367,12 +375,13 @@ class ImageDescriber(ContentRecognizer):
 					"preprocessor_config.json"
 				]
 
+			gui.mainFrame.prePopup()
 			self._progressDialog = wx.ProgressDialog(
 				_("Downloading Model"),
 				_("Connecting"),
 				maximum=100,
 				parent=gui.mainFrame,
-				style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME
+				style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME | wx.PD_AUTO_HIDE
 			)
 			
 			self.downloadDict = {}
@@ -423,15 +432,20 @@ class ImageDescriber(ContentRecognizer):
 		wx.CallAfter(show_ui)
 
 	def _updateProgressDialog(self, progress: int, message: str):
-		if self._progressDialog:
-			try:
-				cont, skip = self._progressDialog.Update(progress, message)
-				if not cont:
-					self._shouldCancel = True
-					if self._activeDownloader:
-						self._activeDownloader.requestCancel()
-			except Exception:
-				pass
+		if getattr(self, "_isUpdatingProgress", False) or not self._progressDialog:
+			return
+		self._isUpdatingProgress = True
+		try:
+			capped = min(max(int(progress), 0), 99)
+			cont, skip = self._progressDialog.Update(capped, message)
+			if not cont:
+				self._shouldCancel = True
+				if self._activeDownloader:
+					self._activeDownloader.requestCancel()
+		except Exception:
+			pass
+		finally:
+			self._isUpdatingProgress = False
 
 	def _cleanupDownload(self, success: bool, localModelDirPath: str, error: str | None = None):
 		if self._activeDownloader:
@@ -441,6 +455,7 @@ class ImageDescriber(ContentRecognizer):
 			self._progressDialog.Hide()
 			self._progressDialog.Destroy()
 			self._progressDialog = None
+			wx.CallLater(50, gui.mainFrame.postPopup)
 
 		if success:
 			ui.message(_("Model downloaded successfully."))
@@ -512,12 +527,13 @@ class ImageDescriber(ContentRecognizer):
 				)
 
 				if dialog.ShowModal() == ReturnCode.YES:
+					gui.mainFrame.prePopup()
 					self._progressDialog = wx.ProgressDialog(
 						_("Downloading Dependencies"),
 						_("Preparing..."),
 						maximum=100,
 						parent=gui.mainFrame,
-						style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME
+						style=wx.PD_CAN_ABORT | wx.PD_ELAPSED_TIME | wx.PD_REMAINING_TIME | wx.PD_AUTO_HIDE
 					)
 					
 					self._shouldCancel = False
