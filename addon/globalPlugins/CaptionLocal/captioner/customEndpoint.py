@@ -17,6 +17,13 @@ try:
 except NameError:
 	_ = lambda x: x
 
+try:
+	from logHandler import log
+	import addonHandler
+	addonHandler.initTranslation()
+except:
+	pass
+
 class CustomEndpointCaptioner(ImageCaptioner):
 	"""Captioner using custom OpenAI-compatible API endpoints."""
 
